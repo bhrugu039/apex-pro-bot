@@ -712,4 +712,106 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 Price: ₹{data.get('price', 0):,.2f}
 📈 Market Cap: ₹{data.get('market_cap', 0):,.0f} Cr
 📉 PE: {data.get('pe_ratio', 0):.2f} (5Y Avg: {data.get('pe_5y_avg', 0):.2f})
-🏦 ROE: {data.get('roe', 0):.1f}% | ROCE: {data.get('roce', 0):.1
+🏦 ROE: {data.get('roe', 0):.1f}% | ROCE: {data.get('roce', 0):.1f}%
+💳 Debt/Equity: {data.get('debt_equity', 0):.2f}
+
+🏢 *BUSINESS QUALITY*: {scores['business']}/40
+"""
+    # Business breakdown
+    for key in ['roe', 'debt', 'profit_growth']:
+        label = scores['business_breakdown'].get(f'{key}_label', '')
+        score = scores['business_breakdown'].get(key, 0)
+        report += f"   • {label}: {score}/10\n"
+    for key in ['cash_flow', 'moat']:
+        label = scores['business_breakdown'].get(f'{key}_label', '')
+        score = scores['business_breakdown'].get(key, 0)
+        report += f"   • {label}: {score}/5\n"
+
+    report += f"""
+💎 *VALUATION*: {scores['value']}/30
+"""
+    for key in ['pe', 'correction']:
+        label = scores['value_breakdown'].get(f'{key}_label', '')
+        score = scores['value_breakdown'].get(key, 0)
+        report += f"   • {label}: {score}/10\n"
+    for key in ['distance', 'pb']:
+        label = scores['value_breakdown'].get(f'{key}_label', '')
+        score = scores['value_breakdown'].get(key, 0)
+        report += f"   • {label}: {score}/5\n"
+
+    report += f"""
+⏰ *TIMING*: {scores['timing']}/30
+"""
+    for key in ['dma_200', 'fii']:
+        label = scores['timing_breakdown'].get(f'{key}_label', '')
+        score = scores['timing_breakdown'].get(key, 0)
+        report += f"   • {label}: {score}/5\n"
+    for key in ['dma_50', 'hh_hl', 'volume', 'rsi', 'dii']:
+        label = scores['timing_breakdown'].get(f'{key}_label', '')
+        score = scores['timing_breakdown'].get(key, 0)
+        report += f"   • {label}: {score}/4\n"
+
+    report += f"""
+━━━━━━━━━━━━━━━━━━━━━
+*TOTAL SCORE: {scores['total']}/100*
+*PHASE: {phase['name']}*
+*ACTION: {phase['action']}*
+
+📋 *Signal:* {signal}
+
+🎯 *BUY PROBABILITY:* {prob['probability']}% (Achieving +10% in 90 days)
+
+💡 *Improvement Triggers:*
+"""
+    for imp in prob['improvements']:
+        report += f"   {imp}\n"
+
+    report += f"""
+📅 Analysis: {datetime.now().strftime('%d %b %Y, %I:%M %p')}
+"""
+    
+    await update.message.reply_text(report, parse_mode='Markdown')
+
+
+async def list_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    stocks = "📋 *Available Stocks*\n━━━━━━━━━━━━━\n"
+    for i, stock in enumerate(STOCK_URLS.keys(), 1):
+        stocks += f"{i}. {stock}\n"
+    await update.message.reply_text(stocks, parse_mode='Markdown')
+
+
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = """
+📖 *APEX PRO Commands*
+
+`/start` - Welcome message
+`/analyze STOCK` - Full analysis report
+`/list` - Available stocks
+`/help` - This message
+
+*Example:* `/analyze IRCTC`
+
+*Methodology:*
+• Business Score (40 pts): ROE, Debt, Growth, Cash Flow, Moat
+• Value Score (30 pts): PE, Correction, Distance from High, PB
+• Timing Score (30 pts): DMA, Trend, Volume, RSI, FII/DII Flow
+"""
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+
+# ============ MAIN ============
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("analyze", analyze))
+    app.add_handler(CommandHandler("list", list_stocks))
+    app.add_handler(CommandHandler("help", help_cmd))
+    
+    print("🚀 APEX PRO Bot is running...")
+    print("Available commands: /analyze STOCK")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
