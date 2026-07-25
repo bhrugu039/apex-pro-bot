@@ -13,14 +13,9 @@ from datetime import datetime
 import os
 
 # ============ CONFIGURATION ============
-# Get from environment variables (for security)
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN environment variable is not set! Please add it in Railway Variables.")
-
-CHAT_ID = os.environ.get("CHAT_ID")
-if not CHAT_ID:
-    raise ValueError("❌ CHAT_ID environment variable is not set! Please add it in Railway Variables.")
+# HARDCODED VALUES (Temporary fix)
+BOT_TOKEN = "8463955309:AAF3XE0baGHt82I7XrY7BIoFVzb01k9woas"
+CHAT_ID = "728405872"
 
 print(f"✅ Bot token loaded: {BOT_TOKEN[:10]}...")
 print(f"✅ Chat ID loaded: {CHAT_ID}")
@@ -60,7 +55,7 @@ class StockScraper:
         try:
             response = requests.get(self.url, headers=self.headers, timeout=15)
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')  # Using html.parser (no lxml needed)
+            soup = BeautifulSoup(response.text, 'html.parser')
             
             self.data['symbol'] = self.symbol
             self.data['name'] = self._get_name(soup)
