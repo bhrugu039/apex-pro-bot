@@ -147,14 +147,11 @@ class StockScraper:
     
     def _get_price(self, soup):
         try:
-            # Look for price in the top section
             price_elem = soup.find('span', {'class': 'current-price'})
             if price_elem:
                 text = price_elem.text.replace(',', '').strip()
                 if text and text != '-':
                     return float(text)
-            
-            # Look for price in any span with rupee symbol
             for span in soup.find_all('span'):
                 if '₹' in span.text:
                     text = span.text.replace('₹', '').replace(',', '').strip()
@@ -166,7 +163,6 @@ class StockScraper:
     
     def _get_pe(self, soup):
         try:
-            # Look for PE in the top metrics
             for li in soup.find_all('li', {'class': 'ratio-li'}):
                 if 'P/E' in li.text:
                     value = li.find('span', {'class': 'ratio-value'})
