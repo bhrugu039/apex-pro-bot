@@ -14,7 +14,7 @@ import os
 
 # ============ CONFIGURATION ============
 # HARDCODED VALUES (Temporary fix - replace with your token)
-BOT_TOKEN = "8463955399:AAF3XE0baGHt82I7XrY7BIoFVzb01k9woas"
+BOT_TOKEN = "8962365949:AAHhoTogxKuhW_Pta7yXjRqCoJTFtBhPZd8"
 CHAT_ID = "728405872"
 
 print(f"✅ Bot token loaded: {BOT_TOKEN[:10]}...")
