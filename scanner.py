@@ -27,33 +27,59 @@ STOCH_THRESH = 20
 
 # ============ STOCK LIST ============
 TARGET_STOCKS = [
-    "IRCTC", "RELIANCE", "TCS", "INFY", "WIPRO", 
+    "IRCTC", "RELIANCE", "TCS", "INFY", "WIPRO",
     "HDFC", "HDFCBANK", "ICICI", "SBIN", "ITC",
     "TATAMOTORS", "TATACONSUM", "TATASTEEL", "TATAPOWER",
     "ONGC", "MARUTI", "SUZLON", "ZOMATO", "PAYTM",
+    "DMART", "NYKAA", "HAL", "ADANIENT", "ADANIPORTS",
+    "BAJFINANCE", "BAJAJFINSV", "LT", "TITAN", "ASIANPAINT",
+    "HINDUNILVR", "NTPC", "POWERGRID", "ULTRACEMCO",
+    "AXISBANK", "KOTAKBANK", "BHARTIARTL", "HCLTECH", "TECHM",
+    "SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "BIOCON",
+    "JSWSTEEL", "COALINDIA", "VEDL", "HINDALCO", "NMDC",
 ]
 
 # ============ BHAVCOPY FUNCTIONS ============
 def download_bhavcopy(date):
     """Download NSE bhavcopy"""
     try:
-        urls = [
-            f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date.strftime('%Y%m%d')}_F_0000.csv.zip",
-            f"https://archives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date.strftime('%Y%m%d')}_F_0000.csv.zip",
+        # Try multiple date formats
+        date_formats = [
+            date.strftime("%d%m%Y"),
+            date.strftime("%Y%m%d")
         ]
+        
+        urls = []
+        for d in date_formats:
+            urls.extend([
+                f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{d}_F_0000.csv.zip",
+                f"https://archives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{d}_F_0000.csv.zip",
+            ])
         
         for url in urls:
             try:
-                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=30)
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                }
+                response = requests.get(url, headers=headers, timeout=30)
+                
                 if response.status_code == 200:
-                    with zipfile.ZipFile(BytesIO(response.content)) as z:
-                        csv_filename = z.namelist()[0]
-                        df = pd.read_csv(z.open(csv_filename))
+                    try:
+                        with zipfile.ZipFile(BytesIO(response.content)) as z:
+                            csv_filename = z.namelist()[0]
+                            df = pd.read_csv(z.open(csv_filename))
+                            return df
+                    except:
+                        df = pd.read_csv(BytesIO(response.content))
                         return df
             except:
                 continue
+        
         return None
-    except:
+        
+    except Exception as e:
+        print(f"Download error: {e}")
         return None
 
 def get_stock_data(symbol, days=300):
@@ -64,21 +90,32 @@ def get_stock_data(symbol, days=300):
     
     all_data = []
     current_date = start_date
+    found_count = 0
+    
+    print(f"   Fetching data for {symbol}...")
     
     while current_date <= end_date:
         if current_date.weekday() < 5:
             df = download_bhavcopy(current_date)
             if df is not None:
-                # Find symbol column
+                # Try different column names
                 symbol_col = None
-                for col in ['SYMBOL', 'Symbol', 'symbol']:
+                for col in ['SYMBOL', 'Symbol', 'symbol', 'SC_NAME', 'SECURITY', 'SYMBOL ']:
                     if col in df.columns:
                         symbol_col = col
                         break
                 
+                # If no symbol column, try first column
+                if symbol_col is None and len(df.columns) > 0:
+                    symbol_col = df.columns[0]
+                
+                if symbol_col is None:
+                    current_date += timedelta(days=1)
+                    continue
+                
                 # Find price columns
                 close_col = None
-                for col in ['CLOSE', 'Close', 'close']:
+                for col in ['CLOSE', 'Close', 'close', 'CLOSING_PRICE', 'LAST']:
                     if col in df.columns:
                         close_col = col
                         break
@@ -102,30 +139,42 @@ def get_stock_data(symbol, days=300):
                         break
                 
                 volume_col = None
-                for col in ['TOTTRDQTY', 'VOLUME', 'Volume']:
+                for col in ['TOTTRDQTY', 'VOLUME', 'Volume', 'volume']:
                     if col in df.columns:
                         volume_col = col
                         break
                 
-                if symbol_col is None:
-                    return None
-                
                 # Find the symbol
-                symbol_df = df[df[symbol_col].astype(str).str.upper() == symbol]
+                try:
+                    symbol_df = df[df[symbol_col].astype(str).str.strip() == symbol]
+                except:
+                    symbol_df = df[df[symbol_col] == symbol]
                 
                 if not symbol_df.empty:
                     row = symbol_df.iloc[0]
-                    all_data.append({
-                        'date': current_date,
-                        'open': float(row[open_col]) if open_col else 0,
-                        'high': float(row[high_col]) if high_col else 0,
-                        'low': float(row[low_col]) if low_col else 0,
-                        'close': float(row[close_col]) if close_col else 0,
-                        'volume': float(row[volume_col]) if volume_col else 0
-                    })
+                    try:
+                        close_val = float(row[close_col]) if close_col else 0
+                        open_val = float(row[open_col]) if open_col else 0
+                        high_val = float(row[high_col]) if high_col else 0
+                        low_val = float(row[low_col]) if low_col else 0
+                        volume_val = float(row[volume_col]) if volume_col else 0
+                        
+                        # Skip zero price entries
+                        if close_val > 0:
+                            all_data.append({
+                                'date': current_date,
+                                'open': open_val,
+                                'high': high_val,
+                                'low': low_val,
+                                'close': close_val,
+                                'volume': volume_val
+                            })
+                            found_count += 1
+                    except:
+                        pass
         
         current_date += timedelta(days=1)
-        time.sleep(0.1)
+        time.sleep(0.05)  # Rate limiting
     
     if not all_data or len(all_data) < 50:
         return None
@@ -198,16 +247,6 @@ def calculate_indicators(df):
         print(f"Indicator error: {e}")
         return None
 
-# ============ TELEGRAM FUNCTIONS ============
-def send_telegram_message(message):
-    """Send message to Telegram"""
-    url = f"{TELEGRAM_API}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
-    try:
-        requests.post(url, json=payload, timeout=10)
-    except:
-        pass
-
 # ============ MAIN ============
 if __name__ == "__main__":
     print("🚀 APEX PRO Scanner Started")
@@ -216,7 +255,7 @@ if __name__ == "__main__":
     
     signals = []
     
-    for symbol in TARGET_STOCKS:
+    for symbol in TARGET_STOCKS[:10]:  # Test with first 10
         print(f"\n📊 Scanning {symbol}...")
         
         try:
@@ -224,6 +263,9 @@ if __name__ == "__main__":
             if df is None or df.empty:
                 print(f"   ❌ No data")
                 continue
+            
+            print(f"   ✅ Data points: {len(df)}")
+            print(f"   📅 Latest: {df['date'].iloc[-1].strftime('%Y-%m-%d')}")
             
             result = calculate_indicators(df)
             if result is None:
