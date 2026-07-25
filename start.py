@@ -18,13 +18,12 @@ def run_scanner():
     os.system("python scanner.py")
 
 def run_scanner_loop():
-    """Run scanner daily at 6:30 PM IST (after NSE bhavcopy release)"""
+    """Run scanner daily at 6:30 PM IST"""
     
     # Run immediately on startup
     run_scanner()
     
     while True:
-        # Calculate time until next 6:30 PM
         now = datetime.now()
         target = now.replace(hour=18, minute=30, second=0, microsecond=0)
         
@@ -42,17 +41,14 @@ def main():
     print("🚀 Starting APEX PRO Services...")
     print(f"📅 Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Start bot in background
     print("🤖 Starting Telegram Bot...")
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
     
-    # Start scanner loop (runs at 6:30 PM daily)
     print("📊 Starting Scanner (scheduled for 6:30 PM IST)...")
     scanner_thread = threading.Thread(target=run_scanner_loop, daemon=True)
     scanner_thread.start()
     
-    # Keep main thread alive
     try:
         while True:
             time.sleep(60)
