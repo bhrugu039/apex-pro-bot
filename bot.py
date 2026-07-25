@@ -46,7 +46,17 @@ class StockScraper:
         self.url = STOCK_URLS.get(self.symbol)
         self.data = {}
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0'
         }
     
     def fetch(self):
@@ -55,11 +65,11 @@ class StockScraper:
         
         try:
             print(f"🔍 Fetching {self.symbol} from Screener.in...")
-            response = requests.get(self.url, headers=self.headers, timeout=20)
+            response = requests.get(self.url, headers=self.headers, timeout=30)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Extract ALL data from Screener.in
+            # Extract data from the page
             self.data['symbol'] = self.symbol
             self.data['name'] = self._get_name(soup)
             self.data['price'] = self._get_price(soup)
@@ -70,12 +80,13 @@ class StockScraper:
             self.data['market_cap'] = self._get_market_cap(soup)
             self.data['dividend_yield'] = self._get_dividend(soup)
             self.data['pb_ratio'] = self._get_pb(soup)
-            self.data['year_high'] = self._get_year_high(soup)
+            self.data['year_high'] = self._get_high(soup)
+            self.data['book_value'] = self._get_book_value(soup)
             
-            # Get growth from profit-loss table
-            growth_data = self._get_growth(soup)
-            self.data['sales_growth'] = growth_data['sales']
-            self.data['profit_growth'] = growth_data['profit']
+            # Get growth data
+            growth = self._get_growth(soup)
+            self.data['sales_growth'] = growth['sales']
+            self.data['profit_growth'] = growth['profit']
             
             # Shareholding pattern
             self.data['shareholding'] = self._get_shareholding(soup)
@@ -122,8 +133,8 @@ class StockScraper:
             # Other metrics
             self.data['rsi'] = 50
             self.data['volume_ratio'] = 1.0
-            self.data['higher_high'] = self.data['price'] > self.data['price_50dma']
-            self.data['higher_low'] = self.data['price'] > self.data['price_50dma'] * 0.98
+            self.data['higher_high'] = self.data['price'] > self.data['price_50dma'] if self.data['price_50dma'] > 0 else False
+            self.data['higher_low'] = self.data['price'] > self.data['price_50dma'] * 0.98 if self.data['price_50dma'] > 0 else False
             self.data['cash_flow_consistency'] = 75
             self.data['moat_score'] = self._get_moat()
             
@@ -177,6 +188,7 @@ class StockScraper:
             'rsi': 50,
             'year_high': 0,
             'pb_ratio': 3,
+            'book_value': 0,
             'volume_ratio': 1.0,
             'higher_high': False,
             'higher_low': False,
@@ -189,22 +201,37 @@ class StockScraper:
             name = soup.find('h1', {'class': 'company-name'})
             if name:
                 return name.text.strip()
+            h1 = soup.find('h1')
+            if h1:
+                return h1.text.strip()
+            title = soup.find('title')
+            if title:
+                return title.text.replace(' share price | About', '').replace(' | Key Insights - Screener', '').strip()
         except:
             pass
         return self.symbol
     
     def _get_price(self, soup):
         try:
-            # Try to find price from the top section
-            price_elem = soup.find('span', {'class': 'current-price'})
+            # Look for current price in the top section
+            price_elem = soup.find('span', string=re.compile(r'₹'))
             if price_elem:
-                text = price_elem.text.replace(',', '').strip()
-                if text and text != '-':
+                text = price_elem.text.replace('₹', '').replace(',', '').strip()
+                if text and text.replace('.', '').isdigit():
                     return float(text)
             
-            # Look for price in the page text
+            # Look in company-ratios section
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
+                if 'Current Price' in li.text:
+                    value = li.find('span', {'class': 'value'})
+                    if value:
+                        text = value.text.replace('₹', '').replace(',', '').strip()
+                        if text and text.replace('.', '').isdigit():
+                            return float(text)
+            
+            # Search entire page text
             text = soup.text
-            match = re.search(r'₹\s*([\d,]+\.?[\d]*)', text)
+            match = re.search(r'Current Price\s*[₹]?\s*([\d,]+\.?[\d]*)', text)
             if match:
                 return float(match.group(1).replace(',', ''))
         except:
@@ -214,86 +241,153 @@ class StockScraper:
     def _get_pe(self, soup):
         try:
             # Look for Stock P/E in the top metrics
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
+                if 'Stock P/E' in li.text:
+                    value = li.find('span', {'class': 'value'})
+                    if value:
+                        return float(value.text.strip())
+            
+            # Search in text
             text = soup.text
             match = re.search(r'Stock P/E\s*([\d.]+)', text)
             if match:
                 return float(match.group(1))
-            
-            # Look for P/E in ratio list
-            for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'P/E' in li.text:
-                    value = li.find('span', {'class': 'ratio-value'})
-                    if value:
-                        return float(value.text.replace(',', '').strip())
         except:
             pass
         return 0
     
     def _get_roe(self, soup):
         try:
-            text = soup.text
-            match = re.search(r'ROE\s*([\d.]+)%', text)
-            if match:
-                return float(match.group(1))
-            
-            for li in soup.find_all('li', {'class': 'ratio-li'}):
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
                 if 'ROE' in li.text and 'Stock' not in li.text:
-                    value = li.find('span', {'class': 'ratio-value'})
+                    value = li.find('span', {'class': 'value'})
                     if value:
                         return float(value.text.replace('%', '').strip())
+            
+            text = soup.text
+            match = re.search(r'ROE\s*([\d.]+)\s*%', text)
+            if match:
+                return float(match.group(1))
         except:
             pass
         return 0
     
     def _get_roce(self, soup):
         try:
-            text = soup.text
-            match = re.search(r'ROCE\s*([\d.]+)%', text)
-            if match:
-                return float(match.group(1))
-            
-            for li in soup.find_all('li', {'class': 'ratio-li'}):
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
                 if 'ROCE' in li.text:
-                    value = li.find('span', {'class': 'ratio-value'})
+                    value = li.find('span', {'class': 'value'})
                     if value:
                         return float(value.text.replace('%', '').strip())
+            
+            text = soup.text
+            match = re.search(r'ROCE\s*([\d.]+)\s*%', text)
+            if match:
+                return float(match.group(1))
         except:
             pass
         return 0
     
     def _get_debt(self, soup):
         try:
-            for li in soup.find_all('li', {'class': 'ratio-li'}):
+            # Check if debt-free in pros
+            text = soup.text
+            if 'almost debt free' in text.lower() or 'debt free' in text.lower():
+                return 0.0
+            
+            # Look in balance sheet if available
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
                 if 'Debt' in li.text and 'equity' in li.text.lower():
-                    value = li.find('span', {'class': 'ratio-value'})
+                    value = li.find('span', {'class': 'value'})
                     if value:
                         return float(value.text.strip())
         except:
             pass
-        return 0
+        return 0.0
     
     def _get_market_cap(self, soup):
         try:
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
+                if 'Market Cap' in li.text:
+                    value = li.find('span', {'class': 'value'})
+                    if value:
+                        text = value.text.replace('₹', '').replace('Cr.', '').replace('Cr', '').replace(',', '').strip()
+                        if text and text.replace('.', '').isdigit():
+                            return float(text)
+            
             text = soup.text
-            match = re.search(r'Market Cap\s*₹\s*([\d,]+)\s*Cr', text)
+            match = re.search(r'Market Cap\s*[₹]?\s*([\d,]+)\s*Cr', text)
             if match:
                 return float(match.group(1).replace(',', ''))
-            
-            for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'Market Cap' in li.text:
-                    value = li.find('span', {'class': 'ratio-value'})
-                    if value:
-                        return float(value.text.replace('Cr', '').replace(',', '').strip())
         except:
             pass
         return 0
     
     def _get_dividend(self, soup):
         try:
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
+                if 'Dividend Yield' in li.text:
+                    value = li.find('span', {'class': 'value'})
+                    if value:
+                        return float(value.text.replace('%', '').strip())
+            
             text = soup.text
-            match = re.search(r'Dividend Yield\s*([\d.]+)%', text)
+            match = re.search(r'Dividend Yield\s*([\d.]+)\s*%', text)
             if match:
                 return float(match.group(1))
+        except:
+            pass
+        return 0
+    
+    def _get_pb(self, soup):
+        try:
+            # Calculate from Price / Book Value
+            price = self.data.get('price', 0)
+            book_value = self._get_book_value(soup)
+            if price > 0 and book_value > 0:
+                return round(price / book_value, 2)
+            
+            # Look for PB in cons section
+            text = soup.text
+            if 'Stock is trading at' in text:
+                match = re.search(r'trading at\s*([\d.]+)\s*times its book value', text)
+                if match:
+                    return float(match.group(1))
+        except:
+            pass
+        return 3.0
+    
+    def _get_book_value(self, soup):
+        try:
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
+                if 'Book Value' in li.text:
+                    value = li.find('span', {'class': 'value'})
+                    if value:
+                        return float(value.text.replace('₹', '').strip())
+            
+            text = soup.text
+            match = re.search(r'Book Value\s*[₹]?\s*([\d.]+)', text)
+            if match:
+                return float(match.group(1))
+        except:
+            pass
+        return 0
+    
+    def _get_high(self, soup):
+        try:
+            for li in soup.find_all('li', {'class': 'flex', 'class': 'flex-space-between'}):
+                if 'High / Low' in li.text:
+                    value = li.find('span', {'class': 'value'})
+                    if value:
+                        text = value.text
+                        match = re.search(r'[₹]?\s*([\d,]+)\s*/\s*([\d,]+)', text)
+                        if match:
+                            return float(match.group(1).replace(',', ''))
+            
+            text = soup.text
+            match = re.search(r'High / Low\s*[₹]?\s*([\d,]+)\s*/\s*([\d,]+)', text)
+            if match:
+                return float(match.group(1).replace(',', ''))
         except:
             pass
         return 0
@@ -304,21 +398,15 @@ class StockScraper:
         profit_growth = 0
         
         try:
-            # Look for compounded growth in the page
             text = soup.text
             
-            # Sales growth
-            match = re.search(r'Sales.*?TTM:\s*([\d.]+)%', text, re.DOTALL)
+            # Look for compounded growth tables
+            # Sales Growth
+            match = re.search(r'Compounded Sales Growth.*?TTM:\s*([\d.]+)%', text, re.DOTALL)
             if match:
                 sales_growth = float(match.group(1))
-            
-            # Profit growth
-            match = re.search(r'Profit.*?TTM:\s*([\d.]+)%', text, re.DOTALL)
-            if match:
-                profit_growth = float(match.group(1))
-            
-            # If not found, try to find in profit-loss table
-            if sales_growth == 0:
+            else:
+                # Try to find in profit-loss table
                 table = soup.find('table', {'id': 'profit-loss'})
                 if table:
                     rows = table.find_all('tr')
@@ -330,6 +418,16 @@ class StockScraper:
                                 prev = float(cells[-2].text.replace(',', '').strip())
                                 if prev > 0:
                                     sales_growth = round(((latest - prev) / prev) * 100, 2)
+            
+            # Profit Growth
+            match = re.search(r'Compounded Profit Growth.*?TTM:\s*([\d.]+)%', text, re.DOTALL)
+            if match:
+                profit_growth = float(match.group(1))
+            else:
+                table = soup.find('table', {'id': 'profit-loss'})
+                if table:
+                    rows = table.find_all('tr')
+                    for row in rows:
                         if 'Net Profit' in row.text:
                             cells = row.find_all('td')
                             if len(cells) >= 3:
@@ -337,13 +435,16 @@ class StockScraper:
                                 prev = float(cells[-2].text.replace(',', '').strip())
                                 if prev > 0:
                                     profit_growth = round(((latest - prev) / prev) * 100, 2)
-        except:
-            pass
-        
-        # Fallback values
-        if sales_growth == 0:
+            
+            # Fallback values
+            if sales_growth == 0:
+                sales_growth = 10
+            if profit_growth == 0:
+                profit_growth = 8
+                
+        except Exception as e:
+            print(f"Error extracting growth: {e}")
             sales_growth = 10
-        if profit_growth == 0:
             profit_growth = 8
         
         return {'sales': sales_growth, 'profit': profit_growth}
@@ -351,55 +452,27 @@ class StockScraper:
     def _get_shareholding(self, soup):
         data = {'fii_change': 0, 'dii_change': 0}
         try:
-            table = soup.find('table', {'class': 'shareholding-pattern'})
+            # Find shareholding table
+            table = soup.find('table', {'id': 'shareholding-pattern'})
+            if not table:
+                table = soup.find('table', {'class': 'shareholding-pattern'})
             if table:
                 rows = table.find_all('tr')
                 for row in rows:
                     cells = row.find_all('td')
                     if len(cells) >= 3:
                         text = ' '.join([c.text for c in cells])
-                        if 'FII' in text or 'Foreign' in text:
+                        if 'FIIs' in text or 'FII' in text:
                             vals = re.findall(r'(\d+\.\d+)%', text)
                             if len(vals) >= 2:
                                 data['fii_change'] = round(float(vals[-1]) - float(vals[-2]), 2)
-                        if 'DII' in text or 'Domestic' in text:
+                        if 'DIIs' in text or 'DII' in text:
                             vals = re.findall(r'(\d+\.\d+)%', text)
                             if len(vals) >= 2:
                                 data['dii_change'] = round(float(vals[-1]) - float(vals[-2]), 2)
         except:
             pass
         return data
-    
-    def _get_pb(self, soup):
-        try:
-            text = soup.text
-            match = re.search(r'Book Value\s*₹\s*([\d.]+)', text)
-            if match:
-                price = self.data.get('price', 0)
-                book_value = float(match.group(1))
-                if book_value > 0:
-                    return round(price / book_value, 2)
-            for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'Book Value' in li.text:
-                    value = li.find('span', {'class': 'ratio-value'})
-                    if value:
-                        price = self.data.get('price', 0)
-                        book_value = float(value.text.replace('₹', '').strip())
-                        if book_value > 0:
-                            return round(price / book_value, 2)
-        except:
-            pass
-        return 3.0
-    
-    def _get_year_high(self, soup):
-        try:
-            text = soup.text
-            match = re.search(r'High / Low\s*₹\s*([\d.]+)\s*/\s*([\d.]+)', text)
-            if match:
-                return float(match.group(1))
-        except:
-            pass
-        return 0
     
     def _get_moat(self):
         moat = {
