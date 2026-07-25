@@ -964,3 +964,30 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ============ EXPORT FOR SCANNER ============
+def analyze_stock_from_symbol(symbol):
+    """Export function for scanner to trigger analysis"""
+    from telegram import Update
+    import asyncio
+    
+    # Create a mock update
+    class MockUpdate:
+        def __init__(self):
+            self.message = MockMessage()
+    
+    class MockMessage:
+        def reply_text(self, text, parse_mode=None):
+            # Send to Telegram
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            payload = {
+                "chat_id": CHAT_ID,
+                "text": text,
+                "parse_mode": parse_mode
+            }
+            requests.post(url, json=payload)
+    
+    update = MockUpdate()
+    
+    # Run analyze function
+    asyncio.run(analyze(update, None))
