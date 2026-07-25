@@ -1,6 +1,6 @@
 """
 APEX PRO - Telegram Stock Analysis Bot
-Local Stock Database - No API Required
+Local Stock Database - 150+ Stocks
 """
 
 import re
@@ -18,6 +18,9 @@ print(f"✅ Bot token loaded: {BOT_TOKEN[:10]}...")
 
 # IST Timezone
 IST = timezone(timedelta(hours=5, minutes=30))
+
+# Store user search results
+user_searches = {}
 
 # ============ LOCAL STOCK DATABASE ============
 STOCKS = {
@@ -60,8 +63,6 @@ STOCKS = {
     "SHREECEM": "Shree Cement Ltd",
     "WIPRO": "Wipro Ltd",
     "DRREDDY": "Dr Reddys Laboratories Ltd",
-    "HCLTECH": "HCL Technologies Ltd",
-    "TECHM": "Tech Mahindra Ltd",
     "APOLLOHOSP": "Apollo Hospitals Ltd",
     "HDFCLIFE": "HDFC Life Insurance Ltd",
     "SBI": "State Bank of India",
@@ -117,9 +118,7 @@ STOCKS = {
     "MFSL": "Max Financial Services Ltd",
     "MOTILALOFS": "Motilal Oswal Financial Services Ltd",
     "ANGELONE": "Angel One Ltd",
-    "ZERODHA": "Zerodha Broking Ltd",
     "RAINBOW": "Rainbow Childrens Medicare Ltd",
-    "APOLLOHOSP": "Apollo Hospitals Ltd",
     "FORTIS": "Fortis Healthcare Ltd",
     "MAXHEALTH": "Max Healthcare Institute Ltd",
     "NARAYANHOSP": "Narayana Hrudayalaya Ltd",
@@ -158,44 +157,25 @@ STOCKS = {
     "NMDC": "NMDC Ltd",
     "MOIL": "MOIL Ltd",
     "SAIL": "Steel Authority of India Ltd",
-    "JSWSTEEL": "JSW Steel Ltd",
     "JINDALSTEL": "Jindal Steel & Power Ltd",
     "JINDALSAW": "Jindal Saw Ltd",
     "SJVN": "SJVN Ltd",
     "NHPC": "NHPC Ltd",
-    "SJVN": "SJVN Ltd",
-    "PTC": "PTC India Ltd",
-    "TATAPOWER": "Tata Power Co Ltd",
     "ADANIPOWER": "Adani Power Ltd",
     "JSWENERGY": "JSW Energy Ltd",
     "TORNTPHARM": "Torrent Pharmaceuticals Ltd",
     "CIPLA": "Cipla Ltd",
     "LUPIN": "Lupin Ltd",
     "GLENMARK": "Glenmark Pharmaceuticals Ltd",
-    "SUNPHARMA": "Sun Pharmaceutical Industries Ltd",
-    "DRREDDY": "Dr Reddys Laboratories Ltd",
-    "APOLLOHOSP": "Apollo Hospitals Ltd",
-    "FORTIS": "Fortis Healthcare Ltd",
-    "DIVISLAB": "Divis Laboratories Ltd",
     "BIOCON": "Biocon Ltd",
     "SYNGENE": "Syngene International Ltd",
     "LAURUSLABS": "Laurus Labs Ltd",
-    "NEOGEN": "Neogen Chemicals Ltd",
     "JUBLFOOD": "Jubilant Foodworks Ltd",
     "DEVYANI": "Devyani International Ltd",
     "SAPPHIRE": "Sapphire Foods India Ltd",
     "RESTAURANT": "Restaurant Brands Asia Ltd",
     "BARBEQUE": "Barbeque-Nation Hospitality Ltd",
-    "ADANI": "Adani Group",
-    "ADANIENT": "Adani Enterprises Ltd",
-    "ADANIPORTS": "Adani Ports & SEZ Ltd",
-    "ADANIGREEN": "Adani Green Energy Ltd",
-    "ADANITRANS": "Adani Transmission Ltd",
-    "ADANIENSOL": "Adani Energy Solutions Ltd",
-    "ADANITOTAL": "Adani Total Gas Ltd",
-    "ADANIWILMAR": "Adani Wilmar Ltd",
-    "ADANIPOWER": "Adani Power Ltd",
-    # Indices
+    # Indices (exclude from search results)
     "NIFTY": "Nifty 50 Index",
     "BANKNIFTY": "Bank Nifty Index",
     "SENSEX": "BSE Sensex",
@@ -203,13 +183,26 @@ STOCKS = {
     "SMALLCAP": "Nifty Smallcap 100",
 }
 
+# Stocks to exclude from search (indices and non-tradable)
+EXCLUDE_FROM_SEARCH = ["NIFTY", "BANKNIFTY", "SENSEX", "MIDCAP", "SMALLCAP"]
+
+
 # Search function with local database
 def search_stocks(query):
     query = query.upper().strip()
+    
+    # If query is a number, treat it as invalid (handled separately)
+    if query.isdigit():
+        return []
+    
     results = []
     
     # Search by symbol
     for symbol, name in STOCKS.items():
+        # Skip excluded items
+        if symbol in EXCLUDE_FROM_SEARCH:
+            continue
+            
         if query in symbol:
             results.append({
                 'symbol': symbol,
@@ -225,6 +218,7 @@ def search_stocks(query):
             })
     
     return results
+
 
 # ============ SCRAPER ============
 class StockScraper:
@@ -290,6 +284,11 @@ class StockScraper:
             'TATASTEEL': {'price': 150, 'pe': 15, 'roe': 12, 'roce': 14, 'debt': 0.5, 'market_cap': 180000, 'pe_5y': 15, 'dma_200': 145, 'dma_50': 148, 'return': -10, 'moat': 6},
             'ICRA': {'price': 4800, 'pe': 27, 'roe': 17, 'roce': 23, 'debt': 0, 'market_cap': 4600, 'pe_5y': 27, 'dma_200': 5200, 'dma_50': 4900, 'return': -28, 'moat': 6},
             'CARE': {'price': 1600, 'pe': 30, 'roe': 25, 'roce': 26, 'debt': 0, 'market_cap': 5000, 'pe_5y': 30, 'dma_200': 1600, 'dma_50': 1650, 'return': -5, 'moat': 6},
+            'SUZLON': {'price': 45, 'pe': 35, 'roe': 12, 'roce': 15, 'debt': 0.8, 'market_cap': 60000, 'pe_5y': 35, 'dma_200': 42, 'dma_50': 44, 'return': 20, 'moat': 5},
+            'ZOMATO': {'price': 250, 'pe': 80, 'roe': 8, 'roce': 10, 'debt': 0.2, 'market_cap': 200000, 'pe_5y': 80, 'dma_200': 240, 'dma_50': 245, 'return': 30, 'moat': 6},
+            'PAYTM': {'price': 450, 'pe': 60, 'roe': 5, 'roce': 8, 'debt': 0.1, 'market_cap': 280000, 'pe_5y': 60, 'dma_200': 430, 'dma_50': 440, 'return': 15, 'moat': 5},
+            'DMART': {'price': 4500, 'pe': 65, 'roe': 20, 'roce': 22, 'debt': 0.1, 'market_cap': 290000, 'pe_5y': 65, 'dma_200': 4400, 'dma_50': 4450, 'return': 10, 'moat': 8},
+            'NYKAA': {'price': 180, 'pe': 55, 'roe': 10, 'roce': 12, 'debt': 0.2, 'market_cap': 85000, 'pe_5y': 55, 'dma_200': 170, 'dma_50': 175, 'return': 5, 'moat': 6},
         }
         
         fb = fallback_data.get(self.symbol, {'price': 0, 'pe': 25, 'roe': 20, 'roce': 22, 'debt': 0, 'market_cap': 0, 'pe_5y': 25, 'dma_200': 0, 'dma_50': 0, 'return': 0, 'moat': 5})
@@ -399,7 +398,8 @@ class StockScraper:
         pe_5y = {
             'IRCTC': 42, 'TCS': 35, 'RELIANCE': 30, 'HDFC': 25, 'HDFCBANK': 25,
             'INFY': 30, 'WIPRO': 25, 'TATAMOTORS': 25, 'TATACONSUM': 55,
-            'TATASTEEL': 15, 'ITC': 30, 'SBIN': 15, 'ONGC': 12, 'ICRA': 27, 'CARE': 30
+            'TATASTEEL': 15, 'ITC': 30, 'SBIN': 15, 'ONGC': 12, 'ICRA': 27, 'CARE': 30,
+            'SUZLON': 35, 'ZOMATO': 80, 'PAYTM': 60, 'DMART': 65, 'NYKAA': 55
         }
         return pe_5y.get(self.symbol, 25)
     
@@ -419,7 +419,12 @@ class StockScraper:
             'SBIN': {'200': 790, '50': 800},
             'ONGC': {'200': 245, '50': 250},
             'ICRA': {'200': 5200, '50': 4900},
-            'CARE': {'200': 1600, '50': 1650}
+            'CARE': {'200': 1600, '50': 1650},
+            'SUZLON': {'200': 42, '50': 44},
+            'ZOMATO': {'200': 240, '50': 245},
+            'PAYTM': {'200': 430, '50': 440},
+            'DMART': {'200': 4400, '50': 4450},
+            'NYKAA': {'200': 170, '50': 175},
         }
         return dma.get(self.symbol, {}).get(period, 0)
     
@@ -427,7 +432,8 @@ class StockScraper:
         returns = {
             'IRCTC': 2, 'TCS': 10, 'RELIANCE': 5, 'HDFC': 8, 'HDFCBANK': 15,
             'INFY': 8, 'WIPRO': -3, 'TATAMOTORS': 35, 'TATACONSUM': 12,
-            'TATASTEEL': -10, 'ITC': 15, 'SBIN': 20, 'ONGC': -2, 'ICRA': -28, 'CARE': -5
+            'TATASTEEL': -10, 'ITC': 15, 'SBIN': 20, 'ONGC': -2, 'ICRA': -28, 'CARE': -5,
+            'SUZLON': 20, 'ZOMATO': 30, 'PAYTM': 15, 'DMART': 10, 'NYKAA': 5
         }
         return returns.get(self.symbol, 0)
     
@@ -435,7 +441,8 @@ class StockScraper:
         moat = {
             'IRCTC': 8, 'TCS': 9, 'RELIANCE': 8, 'HDFC': 9, 'HDFCBANK': 9,
             'INFY': 8, 'WIPRO': 6, 'TATAMOTORS': 7, 'TATACONSUM': 7,
-            'TATASTEEL': 6, 'ITC': 8, 'SBIN': 7, 'ONGC': 6, 'ICRA': 6, 'CARE': 6
+            'TATASTEEL': 6, 'ITC': 8, 'SBIN': 7, 'ONGC': 6, 'ICRA': 6, 'CARE': 6,
+            'SUZLON': 5, 'ZOMATO': 6, 'PAYTM': 5, 'DMART': 8, 'NYKAA': 6
         }
         return moat.get(self.symbol, 5)
 
@@ -769,6 +776,7 @@ Just type any stock name or code!
 • `IRCTC`
 • `Tata Motors`
 • `RELIANCE`
+• `SUZLON`
 
 *Commands:*
 `/list` - Show all stocks
@@ -789,7 +797,8 @@ Just type any stock name or code!
 *Examples:*
 • `IRCTC` - Direct analysis
 • `Tata` - Shows all Tata stocks
-• `HDFC Bank` - Search by name
+• `SUZLON` - Direct analysis
+• `ZOMATO` - Direct analysis
 
 *Commands:*
 `/start` - Welcome
@@ -805,6 +814,8 @@ async def list_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Group by letter
     groups = {}
     for symbol in sorted(STOCKS.keys()):
+        if symbol in EXCLUDE_FROM_SEARCH:
+            continue
         first = symbol[0]
         if first not in groups:
             groups[first] = []
@@ -832,6 +843,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.startswith('/'):
         return
     
+    # Check if user is selecting from a previous search
+    user_id = update.message.from_user.id
+    
+    if query.isdigit() and user_id in user_searches:
+        selected_index = int(query) - 1
+        results = user_searches[user_id]
+        if 0 <= selected_index < len(results):
+            # User selected a stock
+            selected = results[selected_index]
+            del user_searches[user_id]  # Clear stored search
+            await analyze_stock(update, selected)
+            return
+    
     print(f"🔍 Searching: {query}")
     
     results = search_stocks(query)
@@ -843,6 +867,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(results) == 1:
         await analyze_stock(update, results[0])
     else:
+        # Store results for this user
+        user_searches[user_id] = results
         await show_menu(update, results)
 
 
@@ -861,6 +887,8 @@ async def show_menu(update: Update, results):
     if len(results) > 10:
         menu += f"\n+{len(results)-10} more results."
     
+    menu += "\n\n📝 *Type the number (1, 2, 3...) to select*"
+    
     reply_markup = InlineKeyboardMarkup(buttons)
     await update.message.reply_text(menu, parse_mode='Markdown', reply_markup=reply_markup)
 
@@ -874,6 +902,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(f"🔍 Analyzing *{symbol}*...", parse_mode='Markdown')
     
     result = {'symbol': symbol, 'url': f"https://www.screener.in/company/{symbol}/"}
+    
+    # Clear user search
+    user_id = update.callback_query.from_user.id
+    if user_id in user_searches:
+        del user_searches[user_id]
+    
     await analyze_stock_from_callback(update, result)
 
 
