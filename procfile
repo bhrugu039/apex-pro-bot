@@ -1,2 +1,1 @@
-worker: python bot.py
-scanner: python scanner.py
+worker: python start.py
