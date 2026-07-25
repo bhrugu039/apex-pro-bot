@@ -13,8 +13,8 @@ from datetime import datetime
 import os
 
 # ============ CONFIGURATION ============
-# HARDCODED VALUES (Temporary fix)
-BOT_TOKEN = "8962365949:AAHhoTogxKuhW_Pta7yXjRqCoJTFtBhPZd8"
+# HARDCODED VALUES (Temporary fix - replace with your token)
+BOT_TOKEN = "8463955399:AAF3XE0baGHt82I7XrY7BIoFVzb01k9woas"
 CHAT_ID = "728405872"
 
 print(f"✅ Bot token loaded: {BOT_TOKEN[:10]}...")
@@ -45,7 +45,17 @@ class StockScraper:
         self.url = STOCK_URLS.get(self.symbol)
         self.data = {}
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0'
         }
     
     def fetch(self):
@@ -53,9 +63,12 @@ class StockScraper:
             return {"error": f"❌ Stock {self.symbol} not found. Use /list to see available stocks."}
         
         try:
-            response = requests.get(self.url, headers=self.headers, timeout=15)
+            print(f"🔍 Fetching data for {self.symbol} from {self.url}")
+            response = requests.get(self.url, headers=self.headers, timeout=20)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
+            
+            print(f"✅ Page fetched successfully. Length: {len(response.text)} bytes")
             
             self.data['symbol'] = self.symbol
             self.data['name'] = self._get_name(soup)
@@ -82,22 +95,69 @@ class StockScraper:
             self.data['cash_flow_consistency'] = self._get_cash_flow(soup)
             self.data['moat_score'] = self._get_moat_score(soup)
             
+            print(f"📊 Data extracted: {self.data['name']} - ₹{self.data['price']}")
+            
             return self.data
             
         except Exception as e:
+            print(f"❌ Error fetching data: {str(e)}")
             return {"error": f"❌ Failed to fetch data: {str(e)}"}
     
     def _get_name(self, soup):
         try:
-            return soup.find('h1', {'class': 'company-name'}).text.strip()
+            name = soup.find('h1', {'class': 'company-name'})
+            if name:
+                return name.text.strip()
+            title = soup.find('title')
+            if title:
+                return title.text.replace(' Share Price - Screener', '').strip()
+            meta = soup.find('meta', {'property': 'og:title'})
+            if meta:
+                return meta.get('content', '').replace(' Share Price - Screener', '').strip()
         except:
-            return self.symbol
+            pass
+        return self.symbol
     
     def _get_price(self, soup):
         try:
-            elem = soup.find('span', {'class': 'current-price'})
-            if elem:
-                return float(elem.text.replace(',', '').strip())
+            # Try multiple selectors for price
+            price_selectors = [
+                'span[class*="current-price"]',
+                'span[class*="price"]',
+                'div[class*="price"] span',
+                'div[class*="stock-price"]',
+                'span[itemprop="price"]',
+                'div.top-section span.number'
+            ]
+            
+            for selector in price_selectors:
+                try:
+                    elem = soup.select_one(selector)
+                    if elem:
+                        text = elem.text.replace(',', '').strip()
+                        if text and text != '-' and text != '0':
+                            return float(text)
+                except:
+                    continue
+            
+            # Alternative: find any number in the top section
+            top_section = soup.find('div', {'class': 'top-section'})
+            if top_section:
+                numbers = re.findall(r'₹?([\d,]+\.?[\d]*)', top_section.text)
+                if numbers:
+                    return float(numbers[0].replace(',', ''))
+            
+            # Look for price in any span with number
+            all_spans = soup.find_all('span')
+            for span in all_spans:
+                text = span.text.strip().replace(',', '')
+                if text and text.replace('.', '').isdigit() and len(text) > 3:
+                    try:
+                        price = float(text)
+                        if 10 < price < 100000:  # Reasonable price range
+                            return price
+                    except:
+                        pass
         except:
             pass
         return 0.0
@@ -105,10 +165,16 @@ class StockScraper:
     def _get_pe(self, soup):
         try:
             for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'P/E' in li.text:
+                text = li.text
+                if 'P/E' in text:
                     value = li.find('span', {'class': 'ratio-value'})
                     if value:
-                        return float(value.text.replace(',', '').strip())
+                        text_val = value.text.replace(',', '').strip()
+                        if text_val and text_val != '-':
+                            return float(text_val)
+                    numbers = re.findall(r'([\d,]+\.?[\d]*)', text)
+                    if numbers:
+                        return float(numbers[0].replace(',', ''))
         except:
             pass
         return 0.0
@@ -116,10 +182,15 @@ class StockScraper:
     def _get_roe(self, soup):
         try:
             for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'ROE' in li.text and 'Stock' not in li.text:
+                text = li.text
+                if 'ROE' in text and 'Stock' not in text:
                     value = li.find('span', {'class': 'ratio-value'})
                     if value:
                         return float(value.text.replace('%', '').strip())
+                if 'ROE' in text:
+                    numbers = re.findall(r'([\d,]+\.?[\d]*)%', text)
+                    if numbers:
+                        return float(numbers[0].replace(',', ''))
         except:
             pass
         return 0.0
@@ -127,10 +198,15 @@ class StockScraper:
     def _get_roce(self, soup):
         try:
             for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'ROCE' in li.text:
+                text = li.text
+                if 'ROCE' in text:
                     value = li.find('span', {'class': 'ratio-value'})
                     if value:
                         return float(value.text.replace('%', '').strip())
+                if 'ROCE' in text:
+                    numbers = re.findall(r'([\d,]+\.?[\d]*)%', text)
+                    if numbers:
+                        return float(numbers[0].replace(',', ''))
         except:
             pass
         return 0.0
@@ -138,10 +214,15 @@ class StockScraper:
     def _get_debt(self, soup):
         try:
             for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'Debt to equity' in li.text:
+                text = li.text
+                if 'Debt' in text and 'equity' in text.lower():
                     value = li.find('span', {'class': 'ratio-value'})
                     if value:
                         return float(value.text.strip())
+                if 'Debt' in text:
+                    numbers = re.findall(r'([\d,]+\.?[\d]*)', text)
+                    if numbers:
+                        return float(numbers[0].replace(',', ''))
         except:
             pass
         return 0.0
@@ -149,11 +230,17 @@ class StockScraper:
     def _get_market_cap(self, soup):
         try:
             for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'Market Cap' in li.text:
+                text = li.text
+                if 'Market Cap' in text:
                     value = li.find('span', {'class': 'ratio-value'})
                     if value:
-                        text = value.text.replace('Cr', '').replace(',', '').strip()
-                        return float(text)
+                        text_val = value.text.replace('Cr', '').replace(',', '').strip()
+                        if text_val and text_val != '-':
+                            return float(text_val)
+                if 'Market Cap' in text:
+                    numbers = re.findall(r'([\d,]+\.?[\d]*)', text)
+                    if numbers:
+                        return float(numbers[0].replace(',', ''))
         except:
             pass
         return 0.0
@@ -161,7 +248,8 @@ class StockScraper:
     def _get_dividend(self, soup):
         try:
             for li in soup.find_all('li', {'class': 'ratio-li'}):
-                if 'Dividend Yield' in li.text:
+                text = li.text
+                if 'Dividend' in text:
                     value = li.find('span', {'class': 'ratio-value'})
                     if value:
                         return float(value.text.replace('%', '').strip())
@@ -172,16 +260,25 @@ class StockScraper:
     def _get_sales_growth(self, soup):
         try:
             table = soup.find('table', {'id': 'profit-loss'})
+            if not table:
+                table = soup.find('table', {'class': 'data-table'})
             if table:
                 rows = table.find_all('tr')
                 for row in rows:
-                    if 'Sales' in row.text:
+                    text = row.text
+                    if 'Sales' in text or 'Revenue' in text:
                         cells = row.find_all('td')
                         if len(cells) >= 3:
                             latest = float(cells[-1].text.replace(',', '').strip())
                             prev = float(cells[-2].text.replace(',', '').strip())
                             if prev > 0:
                                 return round(((latest - prev) / prev) * 100, 2)
+            for li in soup.find_all('li', {'class': 'ratio-li'}):
+                text = li.text
+                if 'Sales' in text and 'growth' in text.lower():
+                    numbers = re.findall(r'([\d,]+\.?[\d]*)%', text)
+                    if numbers:
+                        return float(numbers[0].replace(',', ''))
         except:
             pass
         return 0.0
@@ -189,10 +286,13 @@ class StockScraper:
     def _get_profit_growth(self, soup):
         try:
             table = soup.find('table', {'id': 'profit-loss'})
+            if not table:
+                table = soup.find('table', {'class': 'data-table'})
             if table:
                 rows = table.find_all('tr')
                 for row in rows:
-                    if 'Net Profit' in row.text:
+                    text = row.text
+                    if 'Net Profit' in text or 'Profit' in text:
                         cells = row.find_all('td')
                         if len(cells) >= 3:
                             latest = float(cells[-1].text.replace(',', '').strip())
@@ -213,11 +313,11 @@ class StockScraper:
                     cells = row.find_all('td')
                     if len(cells) >= 3:
                         text = ' '.join([c.text for c in cells])
-                        if 'FII' in text:
+                        if 'FII' in text or 'Foreign' in text:
                             vals = re.findall(r'(\d+\.\d+)%', text)
                             if len(vals) >= 2:
                                 data['fii_change'] = round(float(vals[-1]) - float(vals[-2]), 2)
-                        if 'DII' in text:
+                        if 'DII' in text or 'Domestic' in text:
                             vals = re.findall(r'(\d+\.\d+)%', text)
                             if len(vals) >= 2:
                                 data['dii_change'] = round(float(vals[-1]) - float(vals[-2]), 2)
@@ -226,89 +326,114 @@ class StockScraper:
         return data
     
     def _get_5y_pe(self, soup):
-        fallback = {'IRCTC': 42, 'ICRA': 27, 'CARE': 30, 'TATACONSUM': 55, 'HDFC': 25, 
-                    'HDFCBANK': 25, 'RELIANCE': 30, 'TCS': 35, 'INFY': 30, 'WIPRO': 25,
-                    'TATAMOTORS': 25, 'ITC': 30, 'SBIN': 15, 'ONGC': 12}
+        fallback = {
+            'IRCTC': 42, 'ICRA': 27, 'CARE': 30, 'TATACONSUM': 55, 
+            'HDFC': 25, 'HDFCBANK': 25, 'RELIANCE': 30, 'TCS': 35, 
+            'INFY': 30, 'WIPRO': 25, 'TATAMOTORS': 25, 'ITC': 30, 
+            'SBIN': 15, 'ONGC': 12
+        }
         return fallback.get(self.symbol, 25)
     
     def _get_200dma(self, soup):
-        fallback = {'IRCTC': 480, 'ICRA': 5200, 'CARE': 1600, 'TATACONSUM': 1100, 
-                    'HDFC': 2800, 'HDFCBANK': 1700, 'RELIANCE': 2400, 'TCS': 4000,
-                    'INFY': 1800, 'WIPRO': 550, 'TATAMOTORS': 850, 'ITC': 420,
-                    'SBIN': 800, 'ONGC': 250}
+        fallback = {
+            'IRCTC': 480, 'ICRA': 5200, 'CARE': 1600, 'TATACONSUM': 1100, 
+            'HDFC': 2800, 'HDFCBANK': 1700, 'RELIANCE': 2400, 'TCS': 4000,
+            'INFY': 1800, 'WIPRO': 550, 'TATAMOTORS': 850, 'ITC': 420,
+            'SBIN': 800, 'ONGC': 250
+        }
         price = self.data.get('price', 0)
-        return fallback.get(self.symbol, price * 0.95)
+        return fallback.get(self.symbol, price * 0.95 if price > 0 else 500)
     
     def _get_50dma(self, soup):
-        fallback = {'IRCTC': 490, 'ICRA': 4900, 'CARE': 1650, 'TATACONSUM': 1080,
-                    'HDFC': 2750, 'HDFCBANK': 1680, 'RELIANCE': 2380, 'TCS': 3950,
-                    'INFY': 1780, 'WIPRO': 545, 'TATAMOTORS': 840, 'ITC': 415,
-                    'SBIN': 790, 'ONGC': 245}
+        fallback = {
+            'IRCTC': 490, 'ICRA': 4900, 'CARE': 1650, 'TATACONSUM': 1080,
+            'HDFC': 2750, 'HDFCBANK': 1680, 'RELIANCE': 2380, 'TCS': 3950,
+            'INFY': 1780, 'WIPRO': 545, 'TATAMOTORS': 840, 'ITC': 415,
+            'SBIN': 790, 'ONGC': 245
+        }
         price = self.data.get('price', 0)
-        return fallback.get(self.symbol, price * 0.98)
+        return fallback.get(self.symbol, price * 0.98 if price > 0 else 490)
     
     def _get_1y_return(self, soup):
-        fallback = {'IRCTC': 2.0, 'ICRA': -28.0, 'CARE': -5.0, 'TATACONSUM': 12.0,
-                    'HDFC': 8.0, 'HDFCBANK': 15.0, 'RELIANCE': 5.0, 'TCS': 10.0,
-                    'INFY': 8.0, 'WIPRO': -3.0, 'TATAMOTORS': 35.0, 'ITC': 15.0,
-                    'SBIN': 20.0, 'ONGC': -2.0}
+        fallback = {
+            'IRCTC': 2.0, 'ICRA': -28.0, 'CARE': -5.0, 'TATACONSUM': 12.0,
+            'HDFC': 8.0, 'HDFCBANK': 15.0, 'RELIANCE': 5.0, 'TCS': 10.0,
+            'INFY': 8.0, 'WIPRO': -3.0, 'TATAMOTORS': 35.0, 'ITC': 15.0,
+            'SBIN': 20.0, 'ONGC': -2.0
+        }
         return fallback.get(self.symbol, 0.0)
     
     def _get_rsi(self, soup):
-        fallback = {'IRCTC': 52, 'ICRA': 35, 'CARE': 45, 'TATACONSUM': 58,
-                    'HDFC': 55, 'HDFCBANK': 60, 'RELIANCE': 50, 'TCS': 55,
-                    'INFY': 52, 'WIPRO': 45, 'TATAMOTORS': 62, 'ITC': 48,
-                    'SBIN': 55, 'ONGC': 42}
+        fallback = {
+            'IRCTC': 52, 'ICRA': 35, 'CARE': 45, 'TATACONSUM': 58,
+            'HDFC': 55, 'HDFCBANK': 60, 'RELIANCE': 50, 'TCS': 55,
+            'INFY': 52, 'WIPRO': 45, 'TATAMOTORS': 62, 'ITC': 48,
+            'SBIN': 55, 'ONGC': 42
+        }
         return fallback.get(self.symbol, 50)
     
     def _get_year_high(self, soup):
-        fallback = {'IRCTC': 620, 'ICRA': 6700, 'CARE': 2000, 'TATACONSUM': 1400,
-                    'HDFC': 3200, 'HDFCBANK': 1900, 'RELIANCE': 2800, 'TCS': 4500,
-                    'INFY': 2000, 'WIPRO': 600, 'TATAMOTORS': 1200, 'ITC': 500,
-                    'SBIN': 850, 'ONGC': 300}
+        fallback = {
+            'IRCTC': 620, 'ICRA': 6700, 'CARE': 2000, 'TATACONSUM': 1400,
+            'HDFC': 3200, 'HDFCBANK': 1900, 'RELIANCE': 2800, 'TCS': 4500,
+            'INFY': 2000, 'WIPRO': 600, 'TATAMOTORS': 1200, 'ITC': 500,
+            'SBIN': 850, 'ONGC': 300
+        }
         price = self.data.get('price', 0)
-        return fallback.get(self.symbol, price * 1.3)
+        return fallback.get(self.symbol, price * 1.3 if price > 0 else 600)
     
     def _get_pb(self, soup):
-        fallback = {'IRCTC': 9.2, 'ICRA': 4.5, 'CARE': 3.2, 'TATACONSUM': 8.5,
-                    'HDFC': 2.5, 'HDFCBANK': 2.8, 'RELIANCE': 2.2, 'TCS': 10.0,
-                    'INFY': 8.0, 'WIPRO': 4.0, 'TATAMOTORS': 2.5, 'ITC': 5.0,
-                    'SBIN': 1.5, 'ONGC': 1.0}
+        fallback = {
+            'IRCTC': 9.2, 'ICRA': 4.5, 'CARE': 3.2, 'TATACONSUM': 8.5,
+            'HDFC': 2.5, 'HDFCBANK': 2.8, 'RELIANCE': 2.2, 'TCS': 10.0,
+            'INFY': 8.0, 'WIPRO': 4.0, 'TATAMOTORS': 2.5, 'ITC': 5.0,
+            'SBIN': 1.5, 'ONGC': 1.0
+        }
         return fallback.get(self.symbol, 3.0)
     
     def _get_volume_ratio(self, soup):
-        fallback = {'IRCTC': 1.2, 'ICRA': 0.8, 'CARE': 1.0, 'TATACONSUM': 1.3,
-                    'HDFC': 1.1, 'HDFCBANK': 1.2, 'RELIANCE': 1.0, 'TCS': 1.1,
-                    'INFY': 1.0, 'WIPRO': 0.9, 'TATAMOTORS': 1.4, 'ITC': 1.1,
-                    'SBIN': 1.2, 'ONGC': 0.9}
+        fallback = {
+            'IRCTC': 1.2, 'ICRA': 0.8, 'CARE': 1.0, 'TATACONSUM': 1.3,
+            'HDFC': 1.1, 'HDFCBANK': 1.2, 'RELIANCE': 1.0, 'TCS': 1.1,
+            'INFY': 1.0, 'WIPRO': 0.9, 'TATAMOTORS': 1.4, 'ITC': 1.1,
+            'SBIN': 1.2, 'ONGC': 0.9
+        }
         return fallback.get(self.symbol, 1.0)
     
     def _get_higher_high(self, soup):
-        fallback = {'IRCTC': True, 'ICRA': False, 'CARE': False, 'TATACONSUM': True,
-                    'HDFC': True, 'HDFCBANK': True, 'RELIANCE': True, 'TCS': True,
-                    'INFY': True, 'WIPRO': False, 'TATAMOTORS': True, 'ITC': True,
-                    'SBIN': True, 'ONGC': False}
+        fallback = {
+            'IRCTC': True, 'ICRA': False, 'CARE': False, 'TATACONSUM': True,
+            'HDFC': True, 'HDFCBANK': True, 'RELIANCE': True, 'TCS': True,
+            'INFY': True, 'WIPRO': False, 'TATAMOTORS': True, 'ITC': True,
+            'SBIN': True, 'ONGC': False
+        }
         return fallback.get(self.symbol, False)
     
     def _get_higher_low(self, soup):
-        fallback = {'IRCTC': True, 'ICRA': False, 'CARE': False, 'TATACONSUM': True,
-                    'HDFC': True, 'HDFCBANK': True, 'RELIANCE': True, 'TCS': True,
-                    'INFY': True, 'WIPRO': False, 'TATAMOTORS': True, 'ITC': True,
-                    'SBIN': True, 'ONGC': False}
+        fallback = {
+            'IRCTC': True, 'ICRA': False, 'CARE': False, 'TATACONSUM': True,
+            'HDFC': True, 'HDFCBANK': True, 'RELIANCE': True, 'TCS': True,
+            'INFY': True, 'WIPRO': False, 'TATAMOTORS': True, 'ITC': True,
+            'SBIN': True, 'ONGC': False
+        }
         return fallback.get(self.symbol, False)
     
     def _get_cash_flow(self, soup):
-        fallback = {'IRCTC': 85, 'ICRA': 75, 'CARE': 80, 'TATACONSUM': 70,
-                    'HDFC': 90, 'HDFCBANK': 92, 'RELIANCE': 80, 'TCS': 88,
-                    'INFY': 85, 'WIPRO': 75, 'TATAMOTORS': 70, 'ITC': 85,
-                    'SBIN': 88, 'ONGC': 75}
+        fallback = {
+            'IRCTC': 85, 'ICRA': 75, 'CARE': 80, 'TATACONSUM': 70,
+            'HDFC': 90, 'HDFCBANK': 92, 'RELIANCE': 80, 'TCS': 88,
+            'INFY': 85, 'WIPRO': 75, 'TATAMOTORS': 70, 'ITC': 85,
+            'SBIN': 88, 'ONGC': 75
+        }
         return fallback.get(self.symbol, 70)
     
     def _get_moat_score(self, soup):
-        fallback = {'IRCTC': 8, 'ICRA': 6, 'CARE': 6, 'TATACONSUM': 7,
-                    'HDFC': 9, 'HDFCBANK': 9, 'RELIANCE': 8, 'TCS': 9,
-                    'INFY': 8, 'WIPRO': 6, 'TATAMOTORS': 7, 'ITC': 8,
-                    'SBIN': 7, 'ONGC': 6}
+        fallback = {
+            'IRCTC': 8, 'ICRA': 6, 'CARE': 6, 'TATACONSUM': 7,
+            'HDFC': 9, 'HDFCBANK': 9, 'RELIANCE': 8, 'TCS': 9,
+            'INFY': 8, 'WIPRO': 6, 'TATAMOTORS': 7, 'ITC': 8,
+            'SBIN': 7, 'ONGC': 6
+        }
         return fallback.get(self.symbol, 5)
 
 
