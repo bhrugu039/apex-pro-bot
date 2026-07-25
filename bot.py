@@ -14,8 +14,8 @@ import os
 
 # ============ CONFIGURATION ============
 # Get from environment variables (for security)
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8463955309:AAF3XE0baGHt82I7XrY7BIoFVzbO1k9woas")
-CHAT_ID = os.environ.get("CHAT_ID", "728405872")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+CHAT_ID = os.environ.get("CHAT_ID", "YOUR_CHAT_ID_HERE")
 
 # Stock URLs on Screener.in
 STOCK_URLS = {
@@ -52,7 +52,7 @@ class StockScraper:
         try:
             response = requests.get(self.url, headers=self.headers, timeout=15)
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, 'html.parser')  # Using html.parser (no lxml needed)
             
             self.data['symbol'] = self.symbol
             self.data['name'] = self._get_name(soup)
@@ -326,59 +326,80 @@ class ThreePillarAnalyzer:
         # ROE (10 pts)
         roe = self.data.get('roe', 0)
         if roe >= 25:
-            scores['roe'] = 10; scores['roe_label'] = "✅ Excellent"
+            scores['roe'] = 10
+            scores['roe_label'] = "✅ Excellent"
         elif roe >= 20:
-            scores['roe'] = 8; scores['roe_label'] = "👍 Good"
+            scores['roe'] = 8
+            scores['roe_label'] = "👍 Good"
         elif roe >= 15:
-            scores['roe'] = 6; scores['roe_label'] = "📊 Average"
+            scores['roe'] = 6
+            scores['roe_label'] = "📊 Average"
         elif roe >= 10:
-            scores['roe'] = 4; scores['roe_label'] = "⚠️ Below avg"
+            scores['roe'] = 4
+            scores['roe_label'] = "⚠️ Below avg"
         else:
-            scores['roe'] = 2; scores['roe_label'] = "❌ Low"
+            scores['roe'] = 2
+            scores['roe_label'] = "❌ Low"
         
         # Debt (10 pts)
         debt = self.data.get('debt_equity', 0)
         if debt < 0.1:
-            scores['debt'] = 10; scores['debt_label'] = "✅ Debt-free"
+            scores['debt'] = 10
+            scores['debt_label'] = "✅ Debt-free"
         elif debt < 0.5:
-            scores['debt'] = 8; scores['debt_label'] = "👍 Low debt"
+            scores['debt'] = 8
+            scores['debt_label'] = "👍 Low debt"
         elif debt < 1.0:
-            scores['debt'] = 6; scores['debt_label'] = "📊 Moderate"
+            scores['debt'] = 6
+            scores['debt_label'] = "📊 Moderate"
         elif debt < 2.0:
-            scores['debt'] = 3; scores['debt_label'] = "⚠️ High"
+            scores['debt'] = 3
+            scores['debt_label'] = "⚠️ High"
         else:
-            scores['debt'] = 0; scores['debt_label'] = "❌ Very high"
+            scores['debt'] = 0
+            scores['debt_label'] = "❌ Very high"
         
         # Profit Growth (10 pts)
         growth = self.data.get('profit_growth', 0)
         if growth >= 20:
-            scores['profit_growth'] = 10; scores['profit_growth_label'] = "✅ Strong"
+            scores['profit_growth'] = 10
+            scores['profit_growth_label'] = "✅ Strong"
         elif growth >= 10:
-            scores['profit_growth'] = 8; scores['profit_growth_label'] = "👍 Healthy"
+            scores['profit_growth'] = 8
+            scores['profit_growth_label'] = "👍 Healthy"
         elif growth >= 5:
-            scores['profit_growth'] = 6; scores['profit_growth_label'] = "📊 Modest"
+            scores['profit_growth'] = 6
+            scores['profit_growth_label'] = "📊 Modest"
         elif growth >= 0:
-            scores['profit_growth'] = 4; scores['profit_growth_label'] = "⚠️ Flat"
+            scores['profit_growth'] = 4
+            scores['profit_growth_label'] = "⚠️ Flat"
         else:
-            scores['profit_growth'] = 0; scores['profit_growth_label'] = "❌ Declining"
+            scores['profit_growth'] = 0
+            scores['profit_growth_label'] = "❌ Declining"
         
         # Cash Flow (5 pts)
         cf = self.data.get('cash_flow_consistency', 70)
         if cf >= 80:
-            scores['cash_flow'] = 5; scores['cash_flow_label'] = "✅ Strong FCF"
+            scores['cash_flow'] = 5
+            scores['cash_flow_label'] = "✅ Strong FCF"
         elif cf >= 60:
-            scores['cash_flow'] = 4; scores['cash_flow_label'] = "👍 Consistent"
+            scores['cash_flow'] = 4
+            scores['cash_flow_label'] = "👍 Consistent"
         else:
-            scores['cash_flow'] = 2; scores['cash_flow_label'] = "⚠️ Inconsistent"
+            scores['cash_flow'] = 2
+            scores['cash_flow_label'] = "⚠️ Inconsistent"
         
         # Moat (5 pts)
         moat = self.data.get('moat_score', 5)
         if moat >= 8:
-            scores['moat'] = 5; scores['moat_label'] = "✅ Wide moat"
+            scores['moat'] = 5
+            scores['moat_label'] = "✅ Wide moat"
         elif moat >= 6:
-            scores['moat'] = 4; scores['moat_label'] = "👍 Narrow moat"
+            scores['moat'] = 4
+            scores['moat_label'] = "👍 Narrow moat"
         else:
-            scores['moat'] = 2; scores['moat_label'] = "📊 Commodity"
+            scores['moat'] = 2
+            scores['moat_label'] = "📊 Commodity"
         
         self.business_breakdown = scores
         self.business_score = sum([v for k, v in scores.items() if not k.endswith('_label')])
@@ -393,54 +414,73 @@ class ThreePillarAnalyzer:
         if current_pe > 0 and avg_pe > 0:
             ratio = current_pe / avg_pe
             if ratio < 0.6:
-                scores['pe'] = 10; scores['pe_label'] = "✅ Very undervalued"
+                scores['pe'] = 10
+                scores['pe_label'] = "✅ Very undervalued"
             elif ratio < 0.75:
-                scores['pe'] = 8; scores['pe_label'] = "👍 Undervalued"
+                scores['pe'] = 8
+                scores['pe_label'] = "👍 Undervalued"
             elif ratio < 0.9:
-                scores['pe'] = 6; scores['pe_label'] = "📊 Fairly valued"
+                scores['pe'] = 6
+                scores['pe_label'] = "📊 Fairly valued"
             elif ratio < 1.1:
-                scores['pe'] = 4; scores['pe_label'] = "⚠️ Slight premium"
+                scores['pe'] = 4
+                scores['pe_label'] = "⚠️ Slight premium"
             else:
-                scores['pe'] = 2; scores['pe_label'] = "❌ Expensive"
+                scores['pe'] = 2
+                scores['pe_label'] = "❌ Expensive"
         else:
-            scores['pe'] = 5; scores['pe_label'] = "📊 Data N/A"
+            scores['pe'] = 5
+            scores['pe_label'] = "📊 Data N/A"
         
         # 1Y Correction (10 pts)
         ret = self.data.get('one_year_return', 0)
         if ret < -30:
-            scores['correction'] = 10; scores['correction_label'] = "✅ Major correction"
+            scores['correction'] = 10
+            scores['correction_label'] = "✅ Major correction"
         elif ret < -20:
-            scores['correction'] = 8; scores['correction_label'] = "👍 Significant"
+            scores['correction'] = 8
+            scores['correction_label'] = "👍 Significant"
         elif ret < -10:
-            scores['correction'] = 6; scores['correction_label'] = "📊 Moderate"
+            scores['correction'] = 6
+            scores['correction_label'] = "📊 Moderate"
         elif ret < 0:
-            scores['correction'] = 4; scores['correction_label'] = "⚠️ Mild"
+            scores['correction'] = 4
+            scores['correction_label'] = "⚠️ Mild"
         else:
-            scores['correction'] = 2; scores['correction_label'] = "📈 No discount"
+            scores['correction'] = 2
+            scores['correction_label'] = "📈 No discount"
         
         # Distance from High (5 pts)
         price = self.data.get('price', 0)
         high = self.data.get('year_high', price * 1.2)
         dist = (1 - (price / high)) * 100 if high > 0 else 0
         if dist > 30:
-            scores['distance'] = 5; scores['distance_label'] = "✅ 30%+ from high"
+            scores['distance'] = 5
+            scores['distance_label'] = "✅ 30%+ from high"
         elif dist > 20:
-            scores['distance'] = 4; scores['distance_label'] = "👍 20%+ from high"
+            scores['distance'] = 4
+            scores['distance_label'] = "👍 20%+ from high"
         elif dist > 10:
-            scores['distance'] = 3; scores['distance_label'] = "📊 10%+ from high"
+            scores['distance'] = 3
+            scores['distance_label'] = "📊 10%+ from high"
         else:
-            scores['distance'] = 1; scores['distance_label'] = "⚠️ Near high"
+            scores['distance'] = 1
+            scores['distance_label'] = "⚠️ Near high"
         
         # PB Ratio (5 pts)
         pb = self.data.get('pb_ratio', 0)
         if pb < 1:
-            scores['pb'] = 5; scores['pb_label'] = "✅ Below book"
+            scores['pb'] = 5
+            scores['pb_label'] = "✅ Below book"
         elif pb < 2:
-            scores['pb'] = 4; scores['pb_label'] = "👍 Reasonable"
+            scores['pb'] = 4
+            scores['pb_label'] = "👍 Reasonable"
         elif pb < 4:
-            scores['pb'] = 3; scores['pb_label'] = "📊 Moderate"
+            scores['pb'] = 3
+            scores['pb_label'] = "📊 Moderate"
         else:
-            scores['pb'] = 1; scores['pb_label'] = "⚠️ Expensive"
+            scores['pb'] = 1
+            scores['pb_label'] = "⚠️ Expensive"
         
         self.value_breakdown = scores
         self.value_score = sum([v for k, v in scores.items() if not k.endswith('_label')])
@@ -454,69 +494,92 @@ class ThreePillarAnalyzer:
         
         # 200 DMA (5 pts)
         if price > dma_200:
-            scores['dma_200'] = 5; scores['dma_200_label'] = "✅ Above 200 DMA"
+            scores['dma_200'] = 5
+            scores['dma_200_label'] = "✅ Above 200 DMA"
         elif price > dma_200 * 0.95:
-            scores['dma_200'] = 3; scores['dma_200_label'] = "📊 Near 200 DMA"
+            scores['dma_200'] = 3
+            scores['dma_200_label'] = "📊 Near 200 DMA"
         else:
-            scores['dma_200'] = 0; scores['dma_200_label'] = "❌ Below 200 DMA"
+            scores['dma_200'] = 0
+            scores['dma_200_label'] = "❌ Below 200 DMA"
         
         # 50 DMA (4 pts)
         if price > dma_50:
-            scores['dma_50'] = 4; scores['dma_50_label'] = "✅ Above 50 DMA"
+            scores['dma_50'] = 4
+            scores['dma_50_label'] = "✅ Above 50 DMA"
         else:
-            scores['dma_50'] = 0; scores['dma_50_label'] = "❌ Below 50 DMA"
+            scores['dma_50'] = 0
+            scores['dma_50_label'] = "❌ Below 50 DMA"
         
         # HH/HL (4 pts)
         hh = self.data.get('higher_high', False)
         hl = self.data.get('higher_low', False)
         if hh and hl:
-            scores['hh_hl'] = 4; scores['hh_hl_label'] = "✅ Uptrend"
+            scores['hh_hl'] = 4
+            scores['hh_hl_label'] = "✅ Uptrend"
         elif hh or hl:
-            scores['hh_hl'] = 2; scores['hh_hl_label'] = "📊 Early trend"
+            scores['hh_hl'] = 2
+            scores['hh_hl_label'] = "📊 Early trend"
         else:
-            scores['hh_hl'] = 0; scores['hh_hl_label'] = "❌ Downtrend"
+            scores['hh_hl'] = 0
+            scores['hh_hl_label'] = "❌ Downtrend"
         
         # Volume (4 pts)
         vol = self.data.get('volume_ratio', 1.0)
         if vol > 2.0:
-            scores['volume'] = 4; scores['volume_label'] = "✅ Strong volume"
+            scores['volume'] = 4
+            scores['volume_label'] = "✅ Strong volume"
         elif vol > 1.5:
-            scores['volume'] = 3; scores['volume_label'] = "👍 Above avg"
+            scores['volume'] = 3
+            scores['volume_label'] = "👍 Above avg"
         elif vol > 1.0:
-            scores['volume'] = 2; scores['volume_label'] = "📊 Average"
+            scores['volume'] = 2
+            scores['volume_label'] = "📊 Average"
         else:
-            scores['volume'] = 0; scores['volume_label'] = "❌ Low volume"
+            scores['volume'] = 0
+            scores['volume_label'] = "❌ Low volume"
         
         # RSI (4 pts)
         rsi = self.data.get('rsi', 50)
         if 40 <= rsi <= 60:
-            scores['rsi'] = 4; scores['rsi_label'] = "✅ Healthy"
+            scores['rsi'] = 4
+            scores['rsi_label'] = "✅ Healthy"
         elif rsi < 35:
-            scores['rsi'] = 3; scores['rsi_label'] = "⚠️ Oversold"
+            scores['rsi'] = 3
+            scores['rsi_label'] = "⚠️ Oversold"
         elif rsi > 65:
-            scores['rsi'] = 2; scores['rsi_label'] = "⚠️ Overbought"
+            scores['rsi'] = 2
+            scores['rsi_label'] = "⚠️ Overbought"
         else:
-            scores['rsi'] = 3; scores['rsi_label'] = "📊 Neutral"
+            scores['rsi'] = 3
+            scores['rsi_label'] = "📊 Neutral"
         
         # FII Trend (5 pts)
         fii = self.data.get('shareholding', {}).get('fii_change', 0)
         if fii > 1.0:
-            scores['fii'] = 5; scores['fii_label'] = "✅ FII buying"
+            scores['fii'] = 5
+            scores['fii_label'] = "✅ FII buying"
         elif fii > 0:
-            scores['fii'] = 4; scores['fii_label'] = "👍 FII accumulation"
+            scores['fii'] = 4
+            scores['fii_label'] = "👍 FII accumulation"
         elif fii > -0.5:
-            scores['fii'] = 2; scores['fii_label'] = "📊 FII neutral"
+            scores['fii'] = 2
+            scores['fii_label'] = "📊 FII neutral"
         else:
-            scores['fii'] = 0; scores['fii_label'] = "❌ FII selling"
+            scores['fii'] = 0
+            scores['fii_label'] = "❌ FII selling"
         
         # DII Trend (4 pts)
         dii = self.data.get('shareholding', {}).get('dii_change', 0)
         if dii > 1.0:
-            scores['dii'] = 4; scores['dii_label'] = "✅ DII buying"
+            scores['dii'] = 4
+            scores['dii_label'] = "✅ DII buying"
         elif dii > 0:
-            scores['dii'] = 3; scores['dii_label'] = "👍 DII accumulation"
+            scores['dii'] = 3
+            scores['dii_label'] = "👍 DII accumulation"
         else:
-            scores['dii'] = 0; scores['dii_label'] = "❌ DII selling"
+            scores['dii'] = 0
+            scores['dii_label'] = "❌ DII selling"
         
         self.timing_breakdown = scores
         self.timing_score = sum([v for k, v in scores.items() if not k.endswith('_label')])
@@ -649,9 +712,4 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 Price: ₹{data.get('price', 0):,.2f}
 📈 Market Cap: ₹{data.get('market_cap', 0):,.0f} Cr
 📉 PE: {data.get('pe_ratio', 0):.2f} (5Y Avg: {data.get('pe_5y_avg', 0):.2f})
-🏦 ROE: {data.get('roe', 0):.1f}% | ROCE: {data.get('roce', 0):.1f}%
-💳 Debt/Equity: {data.get('debt_equity', 0):.2f}
-
-🏢 *BUSINESS QUALITY*: {scores['business']}/40
-"""
-   
+🏦 ROE: {data.get('roe', 0):.1f}% | ROCE: {data.get('roce', 0):.1
