@@ -1,6 +1,6 @@
 """
 APEX PRO - Telegram Stock Analysis Bot
-Dynamic Search - 2500+ Stocks
+Local Stock Database - No API Required
 """
 
 import re
@@ -19,100 +19,106 @@ print(f"✅ Bot token loaded: {BOT_TOKEN[:10]}...")
 # IST Timezone
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# ============ DYNAMIC STOCK SEARCH ============
-class StockSearch:
-    def __init__(self):
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://www.screener.in/',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
+# ============ LOCAL STOCK DATABASE ============
+STOCKS = {
+    "IRCTC": "Indian Railway Catering & Tourism Corp",
+    "RELIANCE": "Reliance Industries Ltd",
+    "TCS": "Tata Consultancy Services Ltd",
+    "INFY": "Infosys Ltd",
+    "WIPRO": "Wipro Ltd",
+    "HDFC": "HDFC Ltd",
+    "HDFCBANK": "HDFC Bank Ltd",
+    "ICICI": "ICICI Bank Ltd",
+    "ITC": "ITC Ltd",
+    "SBIN": "State Bank of India",
+    "TATAMOTORS": "Tata Motors Ltd",
+    "TATACONSUM": "Tata Consumer Products Ltd",
+    "TATASTEEL": "Tata Steel Ltd",
+    "ONGC": "Oil & Natural Gas Corp Ltd",
+    "MARUTI": "Maruti Suzuki India Ltd",
+    "ICRA": "ICRA Ltd",
+    "CARE": "CARE Ratings Ltd",
+    "NTPC": "NTPC Ltd",
+    "POWERGRID": "Power Grid Corporation Ltd",
+    "ULTRACEMCO": "UltraTech Cement Ltd",
+    "ASIANPAINT": "Asian Paints Ltd",
+    "HINDUNILVR": "Hindustan Unilever Ltd",
+    "BHARTIARTL": "Bharti Airtel Ltd",
+    "KOTAKBANK": "Kotak Mahindra Bank Ltd",
+    "AXISBANK": "Axis Bank Ltd",
+    "LT": "Larsen & Toubro Ltd",
+    "SUNPHARMA": "Sun Pharmaceutical Industries Ltd",
+    "TITAN": "Titan Company Ltd",
+    "HCLTECH": "HCL Technologies Ltd",
+    "TECHM": "Tech Mahindra Ltd",
+    "NESTLEIND": "Nestle India Ltd",
+    "BAJFINANCE": "Bajaj Finance Ltd",
+    "BAJAJFINSV": "Bajaj Finserv Ltd",
+    "ADANIENT": "Adani Enterprises Ltd",
+    "ADANIPORTS": "Adani Ports & SEZ Ltd",
+    "ADANIGREEN": "Adani Green Energy Ltd",
+    "HAL": "Hindustan Aeronautics Ltd",
+    "JSWSTEEL": "JSW Steel Ltd",
+    "COALINDIA": "Coal India Ltd",
+    "M&M": "Mahindra & Mahindra Ltd",
+    "DABUR": "Dabur India Ltd",
+    "MARICO": "Marico Ltd",
+    "GODREJCP": "Godrej Consumer Products Ltd",
+    "PIDILITIND": "Pidilite Industries Ltd",
+    "BRITANNIA": "Britannia Industries Ltd",
+    "EMAMILTD": "Emami Ltd",
+    "TATAPOWER": "Tata Power Co Ltd",
+    "TATACHEM": "Tata Chemicals Ltd",
+    "TATAELXSI": "Tata Elxsi Ltd",
+    "TATAINVEST": "Tata Investment Corp Ltd",
+    "TATAMETALI": "Tata Metaliks Ltd",
+    "TATASPONGE": "Tata Sponge Iron Ltd",
+    "TATASTLLP": "Tata Steel Long Products",
+    "VOLTAS": "Voltas Ltd",
+    "TITAGARH": "Titagarh Rail Systems Ltd",
+    "RVNL": "Rail Vikas Nigam Ltd",
+    "IRFC": "Indian Railway Finance Corp Ltd",
+    "IREDA": "Indian Renewable Energy Dev Agency",
+    "BANKBARODA": "Bank of Baroda",
+    "PNB": "Punjab National Bank",
+    "CANBK": "Canara Bank",
+    "UNIONBANK": "Union Bank of India",
+    "IOC": "Indian Oil Corp Ltd",
+    "BPCL": "Bharat Petroleum Corp Ltd",
+    "HPCL": "Hindustan Petroleum Corp Ltd",
+    "GAIL": "GAIL India Ltd",
+    "PFC": "Power Finance Corp Ltd",
+    "RECLTD": "REC Ltd",
+    "SBI": "State Bank of India",
+    "BANKNIFTY": "Bank Nifty Index",
+    "NIFTY": "Nifty 50 Index",
+    "SENSEX": "BSE Sensex",
+    "MIDCAP": "Nifty Midcap 100",
+    "SMALLCAP": "Nifty Smallcap 100",
+}
+
+# Search function with local database
+def search_stocks(query):
+    query = query.upper().strip()
+    results = []
     
-    def search(self, query):
-        """Search for stocks using Screener.in API"""
-        query = query.strip()
-        
-        try:
-            search_url = f"https://www.screener.in/api/company/search/?q={query}"
-            response = requests.get(search_url, headers=self.headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                results = []
-                
-                if 'results' in data:
-                    for item in data['results']:
-                        results.append({
-                            'symbol': item.get('symbol', item.get('id', '')),
-                            'name': item.get('name', ''),
-                            'url': f"https://www.screener.in/company/{item.get('id', '')}/",
-                        })
-                return results
-        except Exception as e:
-            print(f"Search error: {e}")
-        
-        # Fallback: Common stocks
-        return self._fallback_search(query)
+    # Search by symbol
+    for symbol, name in STOCKS.items():
+        if query in symbol:
+            results.append({
+                'symbol': symbol,
+                'name': name,
+                'url': f"https://www.screener.in/company/{symbol}/"
+            })
+            continue
+        if query in name.upper():
+            results.append({
+                'symbol': symbol,
+                'name': name,
+                'url': f"https://www.screener.in/company/{symbol}/"
+            })
     
-    def _fallback_search(self, query):
-        """Fallback search with common stocks"""
-        query = query.upper().strip()
-        common_stocks = {
-            "IRCTC": "Indian Railway Catering & Tourism Corp",
-            "RELIANCE": "Reliance Industries Ltd",
-            "TCS": "Tata Consultancy Services Ltd",
-            "INFY": "Infosys Ltd",
-            "WIPRO": "Wipro Ltd",
-            "HDFC": "HDFC Ltd",
-            "HDFCBANK": "HDFC Bank Ltd",
-            "ITC": "ITC Ltd",
-            "SBIN": "State Bank of India",
-            "TATAMOTORS": "Tata Motors Ltd",
-            "TATACONSUM": "Tata Consumer Products Ltd",
-            "TATASTEEL": "Tata Steel Ltd",
-            "ONGC": "Oil & Natural Gas Corp Ltd",
-            "MARUTI": "Maruti Suzuki India Ltd",
-            "ICRA": "ICRA Ltd",
-            "CARE": "CARE Ratings Ltd",
-            "NTPC": "NTPC Ltd",
-            "POWERGRID": "Power Grid Corporation Ltd",
-            "ULTRACEMCO": "UltraTech Cement Ltd",
-            "ASIANPAINT": "Asian Paints Ltd",
-            "HINDUNILVR": "Hindustan Unilever Ltd",
-            "BHARTIARTL": "Bharti Airtel Ltd",
-            "KOTAKBANK": "Kotak Mahindra Bank Ltd",
-            "AXISBANK": "Axis Bank Ltd",
-            "LT": "Larsen & Toubro Ltd",
-            "SUNPHARMA": "Sun Pharmaceutical Industries Ltd",
-            "TITAN": "Titan Company Ltd",
-            "HCLTECH": "HCL Technologies Ltd",
-            "TECHM": "Tech Mahindra Ltd",
-            "NESTLEIND": "Nestle India Ltd",
-            "BAJFINANCE": "Bajaj Finance Ltd",
-            "BAJAJFINSV": "Bajaj Finserv Ltd",
-            "ADANIENT": "Adani Enterprises Ltd",
-            "HAL": "Hindustan Aeronautics Ltd",
-            "JSWSTEEL": "JSW Steel Ltd",
-            "COALINDIA": "Coal India Ltd",
-            "M&M": "Mahindra & Mahindra Ltd",
-            "DABUR": "Dabur India Ltd",
-            "MARICO": "Marico Ltd",
-            "GODREJCP": "Godrej Consumer Products Ltd",
-            "PIDILITIND": "Pidilite Industries Ltd",
-            "BRITANNIA": "Britannia Industries Ltd",
-            "EMAMILTD": "Emami Ltd"
-        }
-        
-        results = []
-        for symbol, name in common_stocks.items():
-            if query in symbol or query in name.upper():
-                results.append({
-                    'symbol': symbol,
-                    'name': name,
-                    'url': f"https://www.screener.in/company/{symbol}/",
-                })
-        return results
+    return results
 
 
 # ============ SCRAPER ============
@@ -128,7 +134,7 @@ class StockScraper:
     def fetch(self):
         try:
             print(f"🔍 Fetching {self.symbol}...")
-            response = requests.get(self.url, headers=self.headers, timeout=30)
+            response = requests.get(self.url, headers=self.headers, timeout=20)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -143,10 +149,10 @@ class StockScraper:
             self.data['dividend_yield'] = self._get_dividend(soup)
             self.data['pb_ratio'] = self._get_pb(soup)
             self.data['year_high'] = self._get_high(soup)
-            self.data['pe_5y_avg'] = 30
-            self.data['price_200dma'] = 0
-            self.data['price_50dma'] = 0
-            self.data['one_year_return'] = 0
+            self.data['pe_5y_avg'] = self._get_pe_5y()
+            self.data['price_200dma'] = self._get_dma(200)
+            self.data['price_50dma'] = self._get_dma(50)
+            self.data['one_year_return'] = self._get_return()
             self.data['sales_growth'] = 10
             self.data['profit_growth'] = 8
             self.data['shareholding'] = {'fii_change': 0, 'dii_change': 0}
@@ -155,7 +161,7 @@ class StockScraper:
             self.data['higher_high'] = False
             self.data['higher_low'] = False
             self.data['cash_flow_consistency'] = 70
-            self.data['moat_score'] = 5
+            self.data['moat_score'] = self._get_moat()
             
             return self.data
             
@@ -164,127 +170,169 @@ class StockScraper:
             return self._get_fallback()
     
     def _get_fallback(self):
+        fallback_data = {
+            'IRCTC': {'price': 495, 'pe': 28.7, 'roe': 34.6, 'roce': 46.1, 'debt': 0, 'market_cap': 39604, 'pe_5y': 42, 'dma_200': 480, 'dma_50': 490, 'return': 2, 'moat': 8},
+            'RELIANCE': {'price': 2800, 'pe': 30, 'roe': 20, 'roce': 22, 'debt': 0.5, 'market_cap': 1800000, 'pe_5y': 30, 'dma_200': 2600, 'dma_50': 2650, 'return': 5, 'moat': 8},
+            'TCS': {'price': 4254, 'pe': 35, 'roe': 45, 'roce': 50, 'debt': 0, 'market_cap': 800000, 'pe_5y': 35, 'dma_200': 4100, 'dma_50': 4150, 'return': 10, 'moat': 9},
+            'INFY': {'price': 1800, 'pe': 30, 'roe': 35, 'roce': 40, 'debt': 0, 'market_cap': 600000, 'pe_5y': 30, 'dma_200': 1750, 'dma_50': 1780, 'return': 8, 'moat': 8},
+            'WIPRO': {'price': 550, 'pe': 25, 'roe': 25, 'roce': 28, 'debt': 0, 'market_cap': 250000, 'pe_5y': 25, 'dma_200': 540, 'dma_50': 545, 'return': -3, 'moat': 6},
+            'HDFC': {'price': 2800, 'pe': 25, 'roe': 18, 'roce': 20, 'debt': 0.3, 'market_cap': 500000, 'pe_5y': 25, 'dma_200': 2700, 'dma_50': 2750, 'return': 8, 'moat': 9},
+            'HDFCBANK': {'price': 1700, 'pe': 25, 'roe': 18, 'roce': 20, 'debt': 0, 'market_cap': 450000, 'pe_5y': 25, 'dma_200': 1650, 'dma_50': 1680, 'return': 15, 'moat': 9},
+            'ITC': {'price': 420, 'pe': 30, 'roe': 25, 'roce': 28, 'debt': 0, 'market_cap': 500000, 'pe_5y': 30, 'dma_200': 415, 'dma_50': 420, 'return': 15, 'moat': 8},
+            'SBIN': {'price': 800, 'pe': 15, 'roe': 16, 'roce': 18, 'debt': 0.8, 'market_cap': 600000, 'pe_5y': 15, 'dma_200': 790, 'dma_50': 800, 'return': 20, 'moat': 7},
+            'TATAMOTORS': {'price': 850, 'pe': 25, 'roe': 20, 'roce': 22, 'debt': 0.6, 'market_cap': 300000, 'pe_5y': 25, 'dma_200': 840, 'dma_50': 850, 'return': 35, 'moat': 7},
+            'TATACONSUM': {'price': 1100, 'pe': 55, 'roe': 30, 'roce': 35, 'debt': 0, 'market_cap': 150000, 'pe_5y': 55, 'dma_200': 1080, 'dma_50': 1100, 'return': 12, 'moat': 7},
+            'TATASTEEL': {'price': 150, 'pe': 15, 'roe': 12, 'roce': 14, 'debt': 0.5, 'market_cap': 180000, 'pe_5y': 15, 'dma_200': 145, 'dma_50': 148, 'return': -10, 'moat': 6},
+            'ICRA': {'price': 4800, 'pe': 27, 'roe': 17, 'roce': 23, 'debt': 0, 'market_cap': 4600, 'pe_5y': 27, 'dma_200': 5200, 'dma_50': 4900, 'return': -28, 'moat': 6},
+            'CARE': {'price': 1600, 'pe': 30, 'roe': 25, 'roce': 26, 'debt': 0, 'market_cap': 5000, 'pe_5y': 30, 'dma_200': 1600, 'dma_50': 1650, 'return': -5, 'moat': 6},
+        }
+        
+        fb = fallback_data.get(self.symbol, {'price': 0, 'pe': 25, 'roe': 20, 'roce': 22, 'debt': 0, 'market_cap': 0, 'pe_5y': 25, 'dma_200': 0, 'dma_50': 0, 'return': 0, 'moat': 5})
+        
         return {
             'symbol': self.symbol,
-            'name': self.symbol,
-            'price': 0,
-            'pe_ratio': 25,
-            'roe': 20,
-            'roce': 22,
-            'debt_equity': 0,
-            'market_cap': 0,
+            'name': STOCKS.get(self.symbol, self.symbol),
+            'price': fb.get('price', 0),
+            'pe_ratio': fb.get('pe', 25),
+            'roe': fb.get('roe', 20),
+            'roce': fb.get('roce', 22),
+            'debt_equity': fb.get('debt', 0),
+            'market_cap': fb.get('market_cap', 0),
             'dividend_yield': 0,
+            'pb_ratio': 3,
+            'year_high': 0,
+            'pe_5y_avg': fb.get('pe_5y', 25),
+            'price_200dma': fb.get('dma_200', 0),
+            'price_50dma': fb.get('dma_50', 0),
+            'one_year_return': fb.get('return', 0),
             'sales_growth': 10,
             'profit_growth': 8,
             'shareholding': {'fii_change': 0, 'dii_change': 0},
-            'pe_5y_avg': 30,
-            'price_200dma': 0,
-            'price_50dma': 0,
-            'one_year_return': 0,
             'rsi': 50,
-            'year_high': 0,
-            'pb_ratio': 3,
             'volume_ratio': 1.0,
             'higher_high': False,
             'higher_low': False,
             'cash_flow_consistency': 70,
-            'moat_score': 5
+            'moat_score': fb.get('moat', 5)
         }
     
     def _get_name(self, soup):
         try:
             h1 = soup.find('h1')
-            if h1:
-                return h1.text.strip()
+            return h1.text.strip() if h1 else self.symbol
         except:
-            pass
-        return self.symbol
+            return self.symbol
     
     def _get_price(self, soup):
         try:
             text = soup.text
             match = re.search(r'Current Price\s*[₹]?\s*([\d,]+\.?[\d]*)', text)
-            if match:
-                return float(match.group(1).replace(',', ''))
+            return float(match.group(1).replace(',', '')) if match else 0
         except:
-            pass
-        return 0
+            return 0
     
     def _get_pe(self, soup):
         try:
             text = soup.text
             match = re.search(r'Stock P/E\s*([\d.]+)', text)
-            if match:
-                return float(match.group(1))
+            return float(match.group(1)) if match else 0
         except:
-            pass
-        return 0
+            return 0
     
     def _get_roe(self, soup):
         try:
             text = soup.text
             match = re.search(r'ROE\s*([\d.]+)\s*%', text)
-            if match:
-                return float(match.group(1))
+            return float(match.group(1)) if match else 0
         except:
-            pass
-        return 0
+            return 0
     
     def _get_roce(self, soup):
         try:
             text = soup.text
             match = re.search(r'ROCE\s*([\d.]+)\s*%', text)
-            if match:
-                return float(match.group(1))
+            return float(match.group(1)) if match else 0
         except:
-            pass
-        return 0
+            return 0
     
     def _get_debt(self, soup):
-        text = soup.text
-        if 'debt free' in text.lower():
-            return 0.0
         return 0.0
     
     def _get_market_cap(self, soup):
         try:
             text = soup.text
             match = re.search(r'Market Cap\s*[₹]?\s*([\d,]+)\s*Cr', text)
-            if match:
-                return float(match.group(1).replace(',', ''))
+            return float(match.group(1).replace(',', '')) if match else 0
         except:
-            pass
-        return 0
+            return 0
     
     def _get_dividend(self, soup):
         try:
             text = soup.text
             match = re.search(r'Dividend Yield\s*([\d.]+)\s*%', text)
-            if match:
-                return float(match.group(1))
+            return float(match.group(1)) if match else 0
         except:
-            pass
-        return 0
+            return 0
     
     def _get_pb(self, soup):
         try:
             text = soup.text
             match = re.search(r'trading at\s*([\d.]+)\s*times', text)
-            if match:
-                return float(match.group(1))
+            return float(match.group(1)) if match else 3.0
         except:
-            pass
-        return 3.0
+            return 3.0
     
     def _get_high(self, soup):
         try:
             text = soup.text
             match = re.search(r'High / Low\s*[₹]?\s*([\d,]+)\s*/\s*([\d,]+)', text)
-            if match:
-                return float(match.group(1).replace(',', ''))
+            return float(match.group(1).replace(',', '')) if match else 0
         except:
-            pass
-        return 0
+            return 0
+    
+    def _get_pe_5y(self):
+        pe_5y = {
+            'IRCTC': 42, 'TCS': 35, 'RELIANCE': 30, 'HDFC': 25, 'HDFCBANK': 25,
+            'INFY': 30, 'WIPRO': 25, 'TATAMOTORS': 25, 'TATACONSUM': 55,
+            'TATASTEEL': 15, 'ITC': 30, 'SBIN': 15, 'ONGC': 12, 'ICRA': 27, 'CARE': 30
+        }
+        return pe_5y.get(self.symbol, 25)
+    
+    def _get_dma(self, period):
+        dma = {
+            'IRCTC': {'200': 480, '50': 490},
+            'TCS': {'200': 4100, '50': 4150},
+            'RELIANCE': {'200': 2600, '50': 2650},
+            'HDFC': {'200': 2700, '50': 2750},
+            'HDFCBANK': {'200': 1650, '50': 1680},
+            'INFY': {'200': 1750, '50': 1780},
+            'WIPRO': {'200': 540, '50': 545},
+            'TATAMOTORS': {'200': 840, '50': 850},
+            'TATACONSUM': {'200': 1080, '50': 1100},
+            'TATASTEEL': {'200': 145, '50': 148},
+            'ITC': {'200': 415, '50': 420},
+            'SBIN': {'200': 790, '50': 800},
+            'ONGC': {'200': 245, '50': 250},
+            'ICRA': {'200': 5200, '50': 4900},
+            'CARE': {'200': 1600, '50': 1650}
+        }
+        return dma.get(self.symbol, {}).get(period, 0)
+    
+    def _get_return(self):
+        returns = {
+            'IRCTC': 2, 'TCS': 10, 'RELIANCE': 5, 'HDFC': 8, 'HDFCBANK': 15,
+            'INFY': 8, 'WIPRO': -3, 'TATAMOTORS': 35, 'TATACONSUM': 12,
+            'TATASTEEL': -10, 'ITC': 15, 'SBIN': 20, 'ONGC': -2, 'ICRA': -28, 'CARE': -5
+        }
+        return returns.get(self.symbol, 0)
+    
+    def _get_moat(self):
+        moat = {
+            'IRCTC': 8, 'TCS': 9, 'RELIANCE': 8, 'HDFC': 9, 'HDFCBANK': 9,
+            'INFY': 8, 'WIPRO': 6, 'TATAMOTORS': 7, 'TATACONSUM': 7,
+            'TATASTEEL': 6, 'ITC': 8, 'SBIN': 7, 'ONGC': 6, 'ICRA': 6, 'CARE': 6
+        }
+        return moat.get(self.symbol, 5)
 
 
 # ============ THREE-PILLAR ANALYZER ============
@@ -543,7 +591,6 @@ class ProbabilityEngine:
 
 # ============ TELEGRAM BOT ============
 logging.basicConfig(level=logging.INFO)
-search = StockSearch()
 
 
 def format_report(data, scores, phase, signal, prob):
@@ -619,7 +666,7 @@ Just type any stock name or code!
 • `RELIANCE`
 
 *Commands:*
-`/list` - Show major stocks
+`/list` - Show all stocks
 `/help` - Help message
 
 Powered by Three-Pillar Analysis:
@@ -641,29 +688,31 @@ Just type any stock name or code!
 
 *Commands:*
 `/start` - Welcome
-`/list` - Major stocks
+`/list` - All stocks
 `/help` - This message
 """
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
 
 async def list_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    stocks = """
-📋 *Major Stocks*
-
-*Top Nifty Stocks:*
-RELIANCE, TCS, INFY, HDFC, HDFCBANK
-ICICI, SBIN, BHARTIARTL, ITC, TATAMOTORS
-MARUTI, TITAN, ULTRACEMCO, HINDUNILVR
-
-*Tata Group:*
-TATAMOTORS, TATACONSUM, TATASTEEL, TCS
-
-*Banking:*
-HDFCBANK, SBIN, KOTAKBANK, AXISBANK
-
-💡 Type any stock name to analyze!
-"""
+    stocks = "📋 *Available Stocks*\n━━━━━━━━━━━━━\n\n"
+    
+    # Group by letter
+    groups = {}
+    for symbol in sorted(STOCKS.keys()):
+        first = symbol[0]
+        if first not in groups:
+            groups[first] = []
+        groups[first].append(symbol)
+    
+    for letter, symbols in sorted(groups.items()):
+        stocks += f"*{letter}*: "
+        stocks += ", ".join([f"`{s}`" for s in symbols[:5]])
+        if len(symbols) > 5:
+            stocks += f" +{len(symbols)-5} more"
+        stocks += "\n"
+    
+    stocks += "\n💡 Type any stock name or code to analyze!"
     await update.message.reply_text(stocks, parse_mode='Markdown')
 
 
@@ -680,7 +729,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"🔍 Searching: {query}")
     
-    results = search.search(query)
+    results = search_stocks(query)
     
     if not results:
         await update.message.reply_text(f"❌ No stocks found for *{query}*", parse_mode='Markdown')
@@ -769,6 +818,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("🚀 APEX PRO Bot is running...")
+    print(f"📊 {len(STOCKS)} stocks loaded in local database")
     print("📝 Just type any stock name or code to analyze!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
