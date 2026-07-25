@@ -14,7 +14,7 @@ import os
 
 # ============ CONFIGURATION ============
 # Get from environment variables (for security)
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8463955309:AAF3XE0baGHt82I7XrY7BIoFVzbO1k9woas")
 CHAT_ID = os.environ.get("CHAT_ID", "YOUR_CHAT_ID_HERE")
 
 # Stock URLs on Screener.in
